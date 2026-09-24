@@ -25,12 +25,15 @@ class StrategySelector:
 
     def __init__(self, llm=None):
         """
+        函数功能: 统一模型接口并装配用于选择检索策略的 LCEL 链.
         :param llm: 大模型调用对象, 为空时自动创建一个默认客户端
+        :return: None
         """
-        from rag_qa.generation.llm import as_llm
+        from rag_qa.generation.llm import as_llm, build_text_chain
 
         self.llm = as_llm(llm)
         self.strategy_prompt_template = self._get_strategy_prompt()
+        self.strategy_chain = build_text_chain(self.strategy_prompt_template, self.llm)
 
     
     def select_strategy(self, query: str) -> str:
@@ -40,7 +43,7 @@ class StrategySelector:
         :return: 标准策略名(四个常量之一)
         """
         try:
-            raw = self.llm.complete(self.strategy_prompt_template.format(query=query))
+            raw = self.strategy_chain.invoke({"query": query})
             strategy = self._normalize(raw)
         except Exception as e:
             logger.error(f"策略选择失败, 降级为直接检索: {e}")
@@ -67,10 +70,19 @@ class StrategySelector:
 
     
     def call_dashscope(self, prompt: str) -> str:
+        """
+        函数功能: 兼容旧调用入口, 把提示词直接交给统一模型客户端.
+        :param prompt: 已格式化的提示词文本
+        :return: 大模型一次性生成的文本
+        """
         return self.llm.complete(prompt)
 
     
     def _get_strategy_prompt(self):
+        """
+        函数功能: 创建让模型从直接、HyDE、子查询和回溯中选择一种策略的提示模板.
+        :return: 输入 query 后可格式化的 PromptTemplate
+        """
         return PromptTemplate(
             template="""
             你是一个智能助手，负责分析用户查询 {query}，并从以下四种检索增强策略中选择一个最适合的策略，直接返回策略名称，不需要解释过程。

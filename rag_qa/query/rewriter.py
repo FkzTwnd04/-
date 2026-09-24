@@ -14,11 +14,16 @@ class QueryRewriter:
 
     def __init__(self, llm):
         """
+        函数功能: 统一模型接口并预先装配 HyDE、子查询和回溯三条 LCEL 改写链.
         :param llm: 大模型调用对象(LLMClient 或 callable), 由外部注入
+        :return: None
         """
-        from rag_qa.generation.llm import as_llm
+        from rag_qa.generation.llm import as_llm, build_text_chain
 
         self.llm = as_llm(llm)
+        self.hyde_chain = build_text_chain(RAGPrompts.hyde_prompt(), self.llm)
+        self.subquery_chain = build_text_chain(RAGPrompts.subquery_prompt(), self.llm)
+        self.backtrack_chain = build_text_chain(RAGPrompts.backtracking_prompt(), self.llm)
 
     
     def rewrite(self, query: str, mode: str = "direct") -> List[str]:
@@ -39,8 +44,12 @@ class QueryRewriter:
 
     
     def _hyde(self, query: str) -> str:
-        prompt = RAGPrompts.hyde_prompt().format(query=query)
-        hypo_answer = self.llm.complete(prompt).strip()
+        """
+        函数功能: 通过 HyDE 链生成一段假设答案作为检索查询, 空结果时退回原问题.
+        :param query: 用户原始问题
+        :return: 假设答案文本; 生成失败时返回原问题
+        """
+        hypo_answer = self.hyde_chain.invoke({"query": query}).strip()
         
         if not hypo_answer:
             logger.warning("HyDE 生成假设答案失败, 降级为原查询")
@@ -50,8 +59,12 @@ class QueryRewriter:
 
     
     def _subqueries(self, query: str) -> List[str]:
-        prompt = RAGPrompts.subquery_prompt().format(query=query)
-        text = self.llm.complete(prompt).strip()
+        """
+        函数功能: 通过子查询链拆分复杂问题并清理模型输出中的空行.
+        :param query: 用户原始问题
+        :return: 子查询列表; 未生成有效内容时返回只包含原问题的列表
+        """
+        text = self.subquery_chain.invoke({"query": query}).strip()
         subqueries = [q.strip() for q in text.split("\n") if q.strip()]
         if not subqueries:
             logger.warning("未能生成有效的子查询, 降级为原查询")
@@ -61,8 +74,12 @@ class QueryRewriter:
 
     
     def _backtrack(self, query: str) -> str:
-        prompt = RAGPrompts.backtracking_prompt().format(query=query)
-        simplified = self.llm.complete(prompt).strip()
+        """
+        函数功能: 通过回溯链把复杂问题简化为更基础的检索问题.
+        :param query: 用户原始问题
+        :return: 简化后的问题; 生成失败时返回原问题
+        """
+        simplified = self.backtrack_chain.invoke({"query": query}).strip()
         if not simplified:
             logger.warning("回溯问题生成失败, 降级为原查询")
             return query

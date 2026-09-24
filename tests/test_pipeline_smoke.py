@@ -63,6 +63,7 @@ except Exception:
 
 from rag_qa.schema.chunk import Chunk
 from rag_qa.generation.prompts import RAGPrompts
+from rag_qa.generation.llm import build_text_chain
 from rag_qa.query.rewriter import QueryRewriter
 from rag_qa.router.strategy import STRATEGY_SUBQUERY, StrategySelector
 from rag_qa.pipeline.qa import RAGSystem
@@ -107,6 +108,12 @@ class FakeClassifier:
     def predict_category(self, query):
         return "专业咨询"
 
+hyde_chain = build_text_chain(RAGPrompts.hyde_prompt(), FakeLLM())
+assert hyde_chain.invoke({"query": "什么是 RAG"}).strip() == "这是模型的一次性回答"
+stream_chain = build_text_chain(RAGPrompts.hyde_prompt(), FakeLLM(), streaming=True)
+assert "".join(stream_chain.stream({"query": "什么是 RAG"})) == "流式回答内容"
+print("[OK] LCEL 文本链支持 invoke 与逐段 stream")
+
 class FakeSelector:
     def select_strategy(self, query):
         return STRATEGY_SUBQUERY
@@ -119,6 +126,10 @@ rag = RAGSystem(
     strategy_selector=FakeSelector(),
     rewriter=QueryRewriter(FakeLLM()),
 )
+assert hasattr(rag.rag_chain, "invoke") and hasattr(rag.rag_stream_chain, "stream")
+assert hasattr(rag.general_chain, "invoke") and hasattr(rag.general_stream_chain, "stream")
+assert hasattr(rag.rewriter.hyde_chain, "invoke")
+print("[OK] 改写与最终生成步骤均装配为 LCEL 链")
 
 ans = rag.generate_answer("测试问题", source_filter="ai", history=[
     {"question": "上一轮问题", "answer": "上一轮答案"},

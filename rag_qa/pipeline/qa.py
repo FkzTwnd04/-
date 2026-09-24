@@ -10,7 +10,7 @@ from typing import Iterator, List
 
 from base.config import config
 from base.logger import logger
-from rag_qa.generation.llm import as_llm
+from rag_qa.generation.llm import as_llm, build_text_chain
 from rag_qa.generation.prompts import RAGPrompts
 from rag_qa.query.rewriter import QueryRewriter
 from rag_qa.router.classifier import QueryClassifier
@@ -35,6 +35,7 @@ class RAGSystem:
         filters: dict = None,
     ):
         """
+        函数功能: 注入检索、模型、分类与改写组件, 并装配同步和流式 LCEL 生成链.
         :param vector_store: 检索器对象(推荐用 HybridRetriever; 也兼容老的 VectorStore)
         :param llm: 大模型调用对象(LLMClient 或 callable)
         :param classifier: 查询分类器, 为空时自动创建
@@ -43,6 +44,7 @@ class RAGSystem:
         :param retrieval_k: 检索TopK, 默认取配置
         :param candidate_m: 最终送入上下文的文档数, 默认取配置
         :param filters: 额外的检索过滤条件(租户, 文档类型, 时间范围等), 会下推到检索引擎
+        :return: None
         """
         
         self.vector_store = vector_store
@@ -57,7 +59,12 @@ class RAGSystem:
         self.rewriter = rewriter if rewriter is not None else QueryRewriter(self.llm)
 
         
-        self.rag_prompt = RAGPrompts.rag_prompt()
+        self.rag_chain = build_text_chain(RAGPrompts.rag_prompt(), self.llm)
+        self.rag_stream_chain = build_text_chain(RAGPrompts.rag_prompt(), self.llm, streaming=True)
+        self.general_chain = build_text_chain(RAGPrompts.general_prompt(), self.llm)
+        self.general_stream_chain = build_text_chain(
+            RAGPrompts.general_prompt(), self.llm, streaming=True
+        )
 
     
     def retrieve(self, query: str, source_filter: str = None, strategy: str = None) -> List[Chunk]:
@@ -122,6 +129,11 @@ class RAGSystem:
     
     @staticmethod
     def _dedup(chunks: List[Chunk]) -> List[Chunk]:
+        """
+        函数功能: 按 Chunk.dedup_key 保留第一次出现的文本块并维持原排序.
+        :param chunks: 多条改写查询合并后的 Chunk 列表
+        :return: 去重后的 Chunk 列表
+        """
         seen, result = set(), []
         for chunk in chunks:
             key = chunk.dedup_key
@@ -133,6 +145,13 @@ class RAGSystem:
 
     
     def retrieve_and_merge(self, query, source_filter=None, strategy=None):
+        """
+        函数功能: 兼容旧接口, 执行统一检索后把 Chunk 转回 LangChain Document.
+        :param query: 用户原始问题
+        :param source_filter: 可选知识来源过滤条件
+        :param strategy: 可选的指定检索策略
+        :return: LangChain Document 列表
+        """
         chunks = self.retrieve(query, source_filter=source_filter, strategy=strategy)
         return [chunk.to_document() for chunk in chunks]
 
@@ -156,23 +175,33 @@ class RAGSystem:
         return history or []
 
     
-    def _build_prompt(self, query: str, context: str, history) -> str:
+    def _build_rag_inputs(self, query: str, context: str, history) -> dict:
+        """
+        函数功能: 把问题、证据、历史和客服电话整理成 RAG LCEL 链的输入字典.
+        :param query: 用户原始问题
+        :param context: 带引用编号的检索证据文本
+        :param history: 已规范化的最近对话列表
+        :return: 与 RAGPrompts.rag_prompt 输入变量对应的字典
+        """
         history_context = ""
         if history:
             history_context = "\n".join(f"Q: {h['question']}\nA: {h['answer']}" for h in history)
             logger.info(f"使用对话历史: {history_context[:100]}...")
-        return self.rag_prompt.format(
-            context=context,
-            history=history_context,
-            question=query,
-            phone=config.CUSTOMER_SERVICE_PHONE,
-        )
+        return {
+            "context": context,
+            "history": history_context,
+            "question": query,
+            "phone": config.CUSTOMER_SERVICE_PHONE,
+        }
 
     
     def _prepare(self, query: str, source_filter: str = None, history=None):
         """
         函数功能: 分类并准备提示词, 检索阶段的逻辑集中在这里, 生成阶段(流式/非流式)各自复用.
-        :return: (prompt, category, chunks) -> 提示词, 查询类别, 命中的文档块
+        :param query: 用户原始问题
+        :param source_filter: 可选知识来源过滤条件
+        :param history: 可选会话历史列表
+        :return: (chain_inputs, category, chunks) -> LCEL 链输入, 查询类别, 命中的文档块
         """
         history = self._normalize_history(history)
 
@@ -185,12 +214,7 @@ class RAGSystem:
             history_context = "\n".join(
                 f"用户：{item['question']}\n助手：{item['answer']}" for item in history
             )
-            general_prompt = (
-                "你是一个通用中文助手。请直接、清楚地回答用户问题；如果不知道就说明不确定，"
-                "不要假装检索过知识库，也不要编造资料来源。\n\n"
-                f"最近对话：\n{history_context}\n\n用户问题：{query}\n助手回答："
-            )
-            return general_prompt, category, []
+            return {"history": history_context, "question": query}, category, []
 
         
         logger.info("查询为专业咨询, 执行 RAG 流程")
@@ -204,21 +228,38 @@ class RAGSystem:
             context = ""
             logger.info("未检索到相关文档, 上下文为空")
 
-        return self._build_prompt(query, context, history), category, chunks
+        return self._build_rag_inputs(query, context, history), category, chunks
+
+    def _generation_chain(self, category: str, streaming: bool = False):
+        """
+        函数功能: 按问题类别和输出方式选择通用或 RAG 的 LCEL 生成链.
+        :param category: 分类器返回的“通用知识”或专业问题类别
+        :param streaming: False 选择同步链; True 选择流式链
+        :return: 已装配完成、可调用 invoke() 或 stream() 的 LCEL Runnable
+        """
+
+        if category == "通用知识":
+            return self.general_stream_chain if streaming else self.general_chain
+        return self.rag_stream_chain if streaming else self.rag_chain
 
     
     def answer_with_details(self, query: str, source_filter: str = None, history=None) -> dict:
         """
-        运行一次完整问答，并同时返回评测所需的答案、类别和检索结果。
+        函数功能: 运行一次非流式完整问答, 校验引用并返回评测所需的详细结果.
+        :param query: 用户原始问题
+        :param source_filter: 可选知识来源过滤条件
+        :param history: 可选会话历史列表
+        :return: 包含 answer、category、chunks、citations 和 latency_seconds 的字典
 
-        把“准备上下文”和“生成答案”放在同一次调用里，避免评测器先检索再回答时
-        重复跑一遍昂贵的检索流程。API 原有 answer() 仍只取答案字符串，保持调用兼容。
+        说明: 准备上下文和生成答案放在同一次调用中, 避免评测器重复执行昂贵检索.
         """
         start_time = time.time()
         logger.info(f"开始处理查询: '{query}', 来源过滤: {source_filter}")
 
-        prompt, category, chunks = self._prepare(query, source_filter=source_filter, history=history)
-        answer = self.llm.complete(prompt)
+        chain_inputs, category, chunks = self._prepare(
+            query, source_filter=source_filter, history=history
+        )
+        answer = self._generation_chain(category).invoke(chain_inputs)
         if not answer:
             answer = f"抱歉，处理您的问题时出错。请联系人工客服：{config.CUSTOMER_SERVICE_PHONE}"
 
@@ -235,7 +276,13 @@ class RAGSystem:
         }
 
     def answer(self, query: str, source_filter: str = None, history=None) -> str:
-        """生成完整答案；保持旧接口只返回字符串的约定。"""
+        """
+        函数功能: 运行非流式问答并只返回最终答案, 保持旧接口兼容.
+        :param query: 用户原始问题
+        :param source_filter: 可选知识来源过滤条件
+        :param history: 可选会话历史列表
+        :return: 引用校验后的完整答案文本
+        """
         return self.answer_with_details(
             query, source_filter=source_filter, history=history
         )["answer"]
@@ -244,15 +291,21 @@ class RAGSystem:
     def stream_answer(self, query: str, source_filter: str = None, history=None, details_callback=None) -> Iterator[str]:
         """
         函数功能: 流式生成答案, 逐 token 产出(供前端打字机效果使用).
+        :param query: 用户原始问题
+        :param source_filter: 可选知识来源过滤条件
+        :param history: 可选会话历史列表
+        :param details_callback: 生成结束后接收分类和有效引用信息的可选回调
         :return: 生成器, 逐段产出文本
         """
         start_time = time.time()
         logger.info(f"开始处理查询(流式): '{query}', 来源过滤: {source_filter}")
 
         
-        prompt, category, chunks = self._prepare(query, source_filter=source_filter, history=history)
+        chain_inputs, category, chunks = self._prepare(
+            query, source_filter=source_filter, history=history
+        )
         answer_parts = []
-        for token in self.llm.stream(prompt):
+        for token in self._generation_chain(category, streaming=True).stream(chain_inputs):
             answer_parts.append(token)
             yield token
 
@@ -268,7 +321,11 @@ class RAGSystem:
     def generate_answer(self, query: str, source_filter: str = None, history=None, stream: bool = False, details_callback=None):
         """
         函数功能: 生成答案的统一入口.
+        :param query: 用户原始问题
+        :param source_filter: 可选知识来源过滤条件
+        :param history: 可选会话历史列表
         :param stream: False(默认) 返回字符串; True 返回生成器
+        :param details_callback: 流式结束后接收分类和引用信息的可选回调
         :return: str 或 Iterator[str]
         """
         if stream:

@@ -10,6 +10,41 @@ from typing import Iterator
 from base.config import config
 from base.logger import logger
 
+
+def _prompt_to_text(prompt) -> str:
+    """
+    函数功能: 把 LCEL 传入的 PromptValue 或普通对象统一转换成模型可接收的文本.
+    :param prompt: PromptValue、字符串或其他可转成字符串的提示对象
+    :return: 供模型客户端调用的提示文本
+    """
+
+    if hasattr(prompt, "to_string"):
+        return prompt.to_string()
+    return str(prompt)
+
+
+def build_text_chain(prompt_template, llm, streaming: bool = False):
+    """
+    函数功能: 构建 PromptTemplate | RunnableLambda | StrOutputParser 形式的 LCEL 文本链.
+    :param prompt_template: LangChain PromptTemplate, 负责把输入字典格式化为 PromptValue
+    :param llm: LLMClient、兼容 complete/stream 的对象或普通 callable
+    :param streaming: False 使用 complete 一次性返回; True 使用 stream 逐段产出
+    :return: 支持 invoke() 和 stream() 的 LCEL Runnable
+    """
+
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.runnables import RunnableLambda
+
+    client = as_llm(llm)
+    if streaming:
+        def call_model(prompt):
+            yield from client.stream(_prompt_to_text(prompt))
+    else:
+        def call_model(prompt):
+            return client.complete(_prompt_to_text(prompt))
+
+    return prompt_template | RunnableLambda(call_model) | StrOutputParser()
+
 class LLMClient:
     """大模型客户端: 全项目唯一的模型调用入口, 支持一次性返回 和 流式返回."""
 
@@ -22,6 +57,7 @@ class LLMClient:
         system_prompt: str = "你是一个有用的助手, 能够根据用户输入的Prompt严格执行并返回可靠的结果",
     ):
         """
+        函数功能: 创建 OpenAI 兼容的大模型客户端并保存模型调用配置.
         :param api_key: 大模型密钥, 默认取配置(来自 .env)
         :param base_url: 接口地址, 默认取配置
         :param model: 模型名, 默认取配置
@@ -94,6 +130,11 @@ class LLMClient:
 
     
     def __call__(self, prompt: str) -> str:
+        """
+        函数功能: 允许把 LLMClient 当作普通函数调用, 内部转交给 complete().
+        :param prompt: 提示词文本
+        :return: 大模型一次性生成的完整文本
+        """
         return self.complete(prompt)
 
 class CallableLLM:
@@ -103,9 +144,19 @@ class CallableLLM:
     """
 
     def __init__(self, fn):
+        """
+        函数功能: 保存要适配的普通模型调用函数.
+        :param fn: 接收提示词并返回字符串或字符串迭代器的 callable
+        """
         self.fn = fn
 
     def complete(self, prompt: str, temperature: float = 0.1) -> str:
+        """
+        函数功能: 调用被包装函数; 若返回迭代器则收集全部片段并拼成完整文本.
+        :param prompt: 提示词文本
+        :param temperature: 为统一接口保留的温度参数, 普通 callable 不直接使用
+        :return: 完整回答文本
+        """
         result = self.fn(prompt)
         
         if hasattr(result, "__iter__") and not isinstance(result, str):
@@ -113,6 +164,12 @@ class CallableLLM:
         return result or ""
 
     def stream(self, prompt: str, temperature: float = 0.1) -> Iterator[str]:
+        """
+        函数功能: 调用被包装函数并统一转换成逐段文本迭代器.
+        :param prompt: 提示词文本
+        :param temperature: 为统一接口保留的温度参数, 普通 callable 不直接使用
+        :return: 逐段产出回答文本的迭代器
+        """
         result = self.fn(prompt)
         
         if hasattr(result, "__iter__") and not isinstance(result, str):
@@ -122,6 +179,11 @@ class CallableLLM:
             yield str(result or "")
 
     def __call__(self, prompt: str) -> str:
+        """
+        函数功能: 允许把 CallableLLM 当作普通函数调用, 内部转交给 complete().
+        :param prompt: 提示词文本
+        :return: 完整回答文本
+        """
         return self.complete(prompt)
 
 def as_llm(llm):

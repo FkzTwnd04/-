@@ -10,6 +10,10 @@ class RAGPrompts:
     
     @staticmethod
     def rag_prompt():
+        """
+        函数功能: 创建要求基于检索证据回答并标注引用编号的 RAG 提示模板.
+        :return: 输入 context、history、question、phone 后可格式化的 PromptTemplate
+        """
         return PromptTemplate(
             template="""  
                 你是一个严谨的问答助手。先判断问题是否能由给定资料支持，再组织简洁、通俗的回答。
@@ -28,9 +32,33 @@ class RAGPrompts:
             input_variables=["context", "history", "question", "phone"],
         )
 
+    @staticmethod
+    def general_prompt():
+        """
+        函数功能: 创建不依赖知识库的通用问答提示模板.
+        :return: 输入 history 和 question 后可格式化的 PromptTemplate
+        """
+        return PromptTemplate(
+            template="""
+            你是一个通用中文助手。请直接、清楚地回答用户问题；如果不知道就说明不确定，
+            不要假装检索过知识库，也不要编造资料来源。
+
+            最近对话：
+            {history}
+
+            用户问题：{question}
+            助手回答：
+            """,
+            input_variables=["history", "question"],
+        )
+
     
     @staticmethod
     def hyde_prompt():
+        """
+        函数功能: 创建 HyDE 假设答案生成模板, 用生成文本增强后续检索.
+        :return: 输入 query 后可格式化的 PromptTemplate
+        """
         return PromptTemplate(
             template="""  
             假设你是用户，想了解以下问题，请生成一个简短的假设答案：  
@@ -43,6 +71,10 @@ class RAGPrompts:
     
     @staticmethod
     def subquery_prompt():
+        """
+        函数功能: 创建复杂问题拆分模板, 要求模型逐行输出多个简单子查询.
+        :return: 输入 query 后可格式化的 PromptTemplate
+        """
         return PromptTemplate(
             template="""  
             将以下复杂查询分解为多个简单子查询，每行一个子查询：  
@@ -55,6 +87,10 @@ class RAGPrompts:
     
     @staticmethod
     def backtracking_prompt():
+        """
+        函数功能: 创建回溯改写模板, 将复杂问题改写为更基础、更易检索的问题.
+        :return: 输入 query 后可格式化的 PromptTemplate
+        """
         return PromptTemplate(
             template="""  
             将以下复杂查询简化为一个更简单的问题：  

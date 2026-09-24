@@ -53,8 +53,8 @@ integrated_qa_system/
 │   ├── retriever/                            [已实现代码] 嵌入、Milvus、稠密与稀疏混合召回
 │   ├── reranker/rerank.py                    [已实现] 对召回文本重新排序
 │   ├── generation/
-│   │   ├── llm.py                            [已实现] 大模型同步/流式调用
-│   │   └── prompts.py                        [部分实现] 生成规则含证据和引用要求；流式答案尚未统一做最终引用校验
+│   │   ├── llm.py                            [已实现] 大模型同步/流式调用及 LCEL Runnable 适配
+│   │   └── prompts.py                        [部分实现] RAG/通用/改写提示模板；生成链含证据和引用要求
 │   ├── query/rewriter.py                     [已实现代码] HyDE、子查询和回溯查询改写
 │   ├── router/
 │   │   ├── intent.py                         [部分实现] 问候等简单规则分流
@@ -63,7 +63,7 @@ integrated_qa_system/
 │   │   ├── classifier.py                     [已实现·离线保留] 原有 BERT 分类器，用于独立评测
 │   │   └── strategy.py                       [已实现] 按查询选择 RAG 检索/改写策略
 │   ├── pipeline/
-│   │   ├── qa.py                             [部分实现] 分类、策略、检索、重排和生成；租户过滤需从可信身份贯穿
+│   │   ├── qa.py                             [部分实现] 手写业务编排 + LCEL 改写/生成链；租户过滤需从可信身份贯穿
 │   │   ├── integrated.py                     [部分实现] 连接热点问答 BM25、Jev、RAG/通用回答、会话和请求日志
 │   │   └── ingest.py                          [部分实现] 上传任务与索引编排；任务队列和状态查询为单进程方案
 │   ├── evaluation/
@@ -151,8 +151,8 @@ integrated_qa_system/
 | `reranker/` | 对首轮召回结果再排序。 | `rerank.py` 使用重排模型判断哪些文本块更贴近当前问题，并截取较相关的证据。 |
 | `query/` | 改写复杂问题以改善召回。 | `rewriter.py` 提供 HyDE、拆分子问题和回溯补充检索等策略。 |
 | `router/` | 决定请求走数据库答案、专业 RAG 还是通用模型。 | `intent.py` 返回通用问候话术；`jev_classifier.py` 调用 Jev 判断专业或通用问题；`strategy.py` 为专业问题选择检索策略。原 `intent_retriever.py` 和 BERT `classifier.py` 不参与在线主路由。 |
-| `generation/` | 根据检索证据生成自然语言回答。 | `llm.py` 调用大模型，支持普通和流式输出；`prompts.py` 组织提示内容，要求回答尽量依据所给资料并按约定格式引用。 |
-| `pipeline/qa.py` | 执行单次完整 RAG 问答。 | 按分类和策略改写问题、检索、重排证据并调用生成模型。 |
+| `generation/` | 根据检索证据生成自然语言回答。 | `llm.py` 调用大模型，并把项目已有 `complete/stream` 客户端适配为 LCEL Runnable；`prompts.py` 定义 RAG、通用回答和查询改写模板。 |
+| `pipeline/qa.py` | 执行单次完整 RAG 问答。 | 分类、分支、检索和引用校验继续使用普通 Python 编排；策略选择、HyDE/子查询/回溯改写以及 RAG/通用回答使用 `PromptTemplate \| Runnable \| StrOutputParser` LCEL 链，普通与流式输出分别装配。 |
 | `pipeline/integrated.py` | 串接在线问答流程。 | 先检查 `jpkb` 热点问答；未命中时调用 Jev，专业问题进入 RAG，通用问题直接由大模型回答；同时保存会话和运营请求记录。 |
 | `pipeline/ingest.py` | 编排上传文档的后台处理。 | 接收任务、调用索引器、维护任务状态并处理失败；当前调度器以单进程为范围。 |
 | `classify_data/` | 保存问题分类器和提示词相关的训练/配置数据。 | `model_generic_5000.json` 是分类数据样例；文本文件记录分类提示。 |
@@ -199,7 +199,7 @@ flowchart TD
     F --> G{RAG / Agent / AI 专业问题?}
     G -->|否| H[通用大模型直接回答]
     G -->|是| I[查询改写与混合检索]
-    I --> J[重排、组织证据并生成答案]
+    I --> J[重排、组织证据并通过 LCEL 生成链回答]
     J --> L[展示本轮实际引用的文件名]
     K --> S[保存会话和运营请求记录]
     L --> S
@@ -207,6 +207,8 @@ flowchart TD
 ```
 
 当前在线流程不使用向量相似度做意图判定。热点问答近似匹配将 BM25 原始分数用 `score / (score + 1)` 映射到 0—1，再以严格大于 0.85 作为直答门槛；这是初始规则，仍需用标注数据评测误命中。BM25 未命中时由 Jev 分类；Jev 置信度不足或 API 不可用时，问题安全地进入完整 RAG。
+
+查询改写和最终文本生成采用局部 LCEL 链：提示模板先产出 `PromptValue`，模型适配器将其转换为项目客户端可接收的文本，最后由 `StrOutputParser` 统一输出字符串。主路由没有改成一个大型 `RunnableBranch`，因为热点直答、Jev 回退、循环检索、引用校验、会话和运营日志包含较多条件分支与副作用，保留显式 Python 编排更便于理解、调试和记录阶段信息。
 
 ## 前端工作台
 
