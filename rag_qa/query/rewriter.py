@@ -7,6 +7,7 @@
 from typing import List
 
 from base.logger import logger
+from langchain_core.output_parsers import StrOutputParser
 from rag_qa.generation.prompts import RAGPrompts
 
 class QueryRewriter:
@@ -18,12 +19,25 @@ class QueryRewriter:
         :param llm: 大模型调用对象(LLMClient 或 callable), 由外部注入
         :return: None
         """
-        from rag_qa.generation.llm import as_llm, build_text_chain
+        from rag_qa.generation.llm import as_llm, as_runnable
 
         self.llm = as_llm(llm)
-        self.hyde_chain = build_text_chain(RAGPrompts.hyde_prompt(), self.llm)
-        self.subquery_chain = build_text_chain(RAGPrompts.subquery_prompt(), self.llm)
-        self.backtrack_chain = build_text_chain(RAGPrompts.backtracking_prompt(), self.llm)
+        model = as_runnable(self.llm)
+        self.hyde_chain = (
+            RAGPrompts.hyde_prompt()
+            | model
+            | StrOutputParser()
+        )
+        self.subquery_chain = (
+            RAGPrompts.subquery_prompt()
+            | model
+            | StrOutputParser()
+        )
+        self.backtrack_chain = (
+            RAGPrompts.backtracking_prompt()
+            | model
+            | StrOutputParser()
+        )
 
     
     def rewrite(self, query: str, mode: str = "direct") -> List[str]:

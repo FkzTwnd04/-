@@ -6,6 +6,7 @@ riter 执行。
 """
 
 from base.logger import logger
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 
 STRATEGY_DIRECT = "直接检索"
@@ -29,11 +30,15 @@ class StrategySelector:
         :param llm: 大模型调用对象, 为空时自动创建一个默认客户端
         :return: None
         """
-        from rag_qa.generation.llm import as_llm, build_text_chain
+        from rag_qa.generation.llm import as_llm, as_runnable
 
         self.llm = as_llm(llm)
         self.strategy_prompt_template = self._get_strategy_prompt()
-        self.strategy_chain = build_text_chain(self.strategy_prompt_template, self.llm)
+        self.strategy_chain = (
+            self.strategy_prompt_template
+            | as_runnable(self.llm)
+            | StrOutputParser()
+        )
 
     
     def select_strategy(self, query: str) -> str:

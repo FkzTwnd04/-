@@ -23,27 +23,27 @@ def _prompt_to_text(prompt) -> str:
     return str(prompt)
 
 
-def build_text_chain(prompt_template, llm, streaming: bool = False):
+def as_runnable(llm, streaming: bool = False):
     """
-    函数功能: 构建 PromptTemplate | RunnableLambda | StrOutputParser 形式的 LCEL 文本链.
-    :param prompt_template: LangChain PromptTemplate, 负责把输入字典格式化为 PromptValue
+    函数功能: 把项目模型客户端适配成可放在 LCEL 管道中间的 RunnableLambda.
     :param llm: LLMClient、兼容 complete/stream 的对象或普通 callable
     :param streaming: False 使用 complete 一次性返回; True 使用 stream 逐段产出
-    :return: 支持 invoke() 和 stream() 的 LCEL Runnable
+    :return: 可与 PromptTemplate 和 StrOutputParser 通过管道符组合的 RunnableLambda
     """
 
-    from langchain_core.output_parsers import StrOutputParser
     from langchain_core.runnables import RunnableLambda
 
     client = as_llm(llm)
     if streaming:
         def call_model(prompt):
+            """把上游 PromptValue 转成文本并逐段产出模型结果。"""
             yield from client.stream(_prompt_to_text(prompt))
     else:
         def call_model(prompt):
+            """把上游 PromptValue 转成文本并一次性返回模型结果。"""
             return client.complete(_prompt_to_text(prompt))
 
-    return prompt_template | RunnableLambda(call_model) | StrOutputParser()
+    return RunnableLambda(call_model)
 
 class LLMClient:
     """大模型客户端: 全项目唯一的模型调用入口, 支持一次性返回 和 流式返回."""

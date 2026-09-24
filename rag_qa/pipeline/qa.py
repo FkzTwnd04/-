@@ -10,7 +10,8 @@ from typing import Iterator, List
 
 from base.config import config
 from base.logger import logger
-from rag_qa.generation.llm import as_llm, build_text_chain
+from langchain_core.output_parsers import StrOutputParser
+from rag_qa.generation.llm import as_llm, as_runnable
 from rag_qa.generation.prompts import RAGPrompts
 from rag_qa.query.rewriter import QueryRewriter
 from rag_qa.router.classifier import QueryClassifier
@@ -59,11 +60,28 @@ class RAGSystem:
         self.rewriter = rewriter if rewriter is not None else QueryRewriter(self.llm)
 
         
-        self.rag_chain = build_text_chain(RAGPrompts.rag_prompt(), self.llm)
-        self.rag_stream_chain = build_text_chain(RAGPrompts.rag_prompt(), self.llm, streaming=True)
-        self.general_chain = build_text_chain(RAGPrompts.general_prompt(), self.llm)
-        self.general_stream_chain = build_text_chain(
-            RAGPrompts.general_prompt(), self.llm, streaming=True
+        model = as_runnable(self.llm)
+        streaming_model = as_runnable(self.llm, streaming=True)
+
+        self.rag_chain = (
+            RAGPrompts.rag_prompt()
+            | model
+            | StrOutputParser()
+        )
+        self.rag_stream_chain = (
+            RAGPrompts.rag_prompt()
+            | streaming_model
+            | StrOutputParser()
+        )
+        self.general_chain = (
+            RAGPrompts.general_prompt()
+            | model
+            | StrOutputParser()
+        )
+        self.general_stream_chain = (
+            RAGPrompts.general_prompt()
+            | streaming_model
+            | StrOutputParser()
         )
 
     

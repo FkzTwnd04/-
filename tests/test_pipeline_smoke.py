@@ -63,10 +63,11 @@ except Exception:
 
 from rag_qa.schema.chunk import Chunk
 from rag_qa.generation.prompts import RAGPrompts
-from rag_qa.generation.llm import build_text_chain
+from rag_qa.generation.llm import as_runnable
 from rag_qa.query.rewriter import QueryRewriter
 from rag_qa.router.strategy import STRATEGY_SUBQUERY, StrategySelector
 from rag_qa.pipeline.qa import RAGSystem
+from langchain_core.output_parsers import StrOutputParser
 print("[OK] 新分层包导入成功")
 
 doc = Document(page_content="正文内容", metadata={"source": "ai", "timestamp": "2026-09-22",
@@ -108,9 +109,13 @@ class FakeClassifier:
     def predict_category(self, query):
         return "专业咨询"
 
-hyde_chain = build_text_chain(RAGPrompts.hyde_prompt(), FakeLLM())
+hyde_chain = RAGPrompts.hyde_prompt() | as_runnable(FakeLLM()) | StrOutputParser()
 assert hyde_chain.invoke({"query": "什么是 RAG"}).strip() == "这是模型的一次性回答"
-stream_chain = build_text_chain(RAGPrompts.hyde_prompt(), FakeLLM(), streaming=True)
+stream_chain = (
+    RAGPrompts.hyde_prompt()
+    | as_runnable(FakeLLM(), streaming=True)
+    | StrOutputParser()
+)
 assert "".join(stream_chain.stream({"query": "什么是 RAG"})) == "流式回答内容"
 print("[OK] LCEL 文本链支持 invoke 与逐段 stream")
 
