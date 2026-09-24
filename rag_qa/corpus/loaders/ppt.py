@@ -38,6 +38,11 @@ class OCRPPTLoader(BaseLoader):
         yield Document(page_content=line, metadata={"source": self.filepath})
 
     def ppt2text(self, filepath):
+        """
+        函数功能: 逐页遍历 PPT 幻灯片，按形状的上、左位置排序后提取文本框、表格文字及图片 OCR 结果，拼接为一个字符串.
+        :param filepath: 待解析的 PPT(.pptx) 文件路径
+        :return: 所有幻灯片内容拼接后的文本字符串
+        """
         
         prs = Presentation(filepath)
         print(f'prs-->{prs}')
@@ -47,6 +52,11 @@ class OCRPPTLoader(BaseLoader):
         resp = ""
 
         def extract_text(shape):
+            """
+            函数功能: 从单个形状中提取文本框文字、表格单元格文字和图片(shape_type 13) OCR 结果追加到外层 resp；遇到组合形状(shape_type 6)时递归处理子形状.
+            :param shape: python-pptx 的幻灯片形状对象
+            :return: None
+            """
             
             
             nonlocal resp

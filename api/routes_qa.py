@@ -30,11 +30,20 @@ router = APIRouter()
 
 @router.post("/api/create_session")
 async def create_session():
+    """
+    函数功能: 生成一个新的 UUID 作为会话编号, 不写入数据库.
+    :return: JSON 对象 {"session_id": 新会话编号字符串}
+    """
     session_id = str(uuid.uuid4())  
     return {"session_id": session_id}  
 
 @router.get("/api/history/{session_id}")
 async def get_history(session_id: str):
+    """
+    函数功能: 通过共享问答系统读取指定会话的历史记录, 任何异常都转换为 500 错误.
+    :param session_id: 要查询的会话编号
+    :return: JSON 对象 {"session_id": 会话编号, "history": 对话记录列表}
+    """
     try:
         
         history = get_qa_system().get_session_history(session_id)
@@ -47,6 +56,11 @@ async def get_history(session_id: str):
 
 @router.delete("/api/history/{session_id}")
 async def clear_history(session_id: str):
+    """
+    函数功能: 清除指定会话的历史记录, 清除失败时返回 500 错误.
+    :param session_id: 要清除历史的会话编号
+    :return: JSON 对象 {"status": "success", "message": "历史记录已清除"}
+    """
     
     success = get_qa_system().clear_session_history(session_id)
     if success:
@@ -58,6 +72,11 @@ async def clear_history(session_id: str):
 
 @router.post("/api/query")
 async def query(request: QueryRequest):
+    """
+    函数功能: 处理非流式问答请求, 问候语或命中 jpkb 热点问答时直接返回答案并记录日志与会话历史, 否则提示改用 WebSocket 流式接口; query 为空时返回 400 错误.
+    :param request: 问答请求体, 包含 query 和可选的 session_id
+    :return: JSON 对象; 问候时含 answer/is_streaming=False/answer_mode="greeting"/session_id/processing_time, 未命中时含提示 answer/is_streaming=True/session_id/processing_time, 命中热点问答时另含 hit_layer/answer_mode/intent/request_id
+    """
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query 不能为空")
     start_time = time.time()  
@@ -105,6 +124,11 @@ async def query(request: QueryRequest):
 
 @router.websocket("/api/stream")
 async def websocket_endpoint(websocket: WebSocket):
+    """
+    函数功能: 在 WebSocket 连接上循环接收 JSON 问题, 问候语直接回复, 其他问题调用问答系统逐 token 流式推送答案; 出现异常时发送 error 消息, 结束时关闭连接并恢复 trace_id.
+    :param websocket: 客户端 WebSocket 连接, 每条消息为含 query/可选 source_filter/session_id 的 JSON 文本
+    :return: None; 通过连接发送 start(含 session_id)、token(含 token/session_id)、end(含 session_id/is_complete/processing_time, 问答路径另含 request_id/answer_mode/citations)、error(含 error) 类型消息
+    """
     await websocket.accept()  
     trace_token = set_trace_id()
     client_host = websocket.client.host if websocket.client else "unknown"
@@ -206,6 +230,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @router.get("/health")
 async def health_check():
+    """
+    函数功能: 健康检查接口, 固定返回健康状态, 不检查数据库或模型等依赖.
+    :return: JSON 对象 {"status": "healthy"}
+    """
     
     return {"status": "healthy"}  
 

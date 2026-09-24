@@ -27,6 +27,14 @@ class IngestService:
         max_concurrent: Optional[int] = None,  # 同一进程允许并行执行的索引任务数，防止模型显存被占满。
         max_upload_bytes: Optional[int] = None,  # 单个文件可接受的最大字节数，避免无界上传占满磁盘和内存。
     ):
+        """
+        函数功能: 初始化摄取服务, 解析上传目录、并发上限(至少为 1)和单文件大小上限, 并创建并发信号量、任务状态字典和锁.
+        :param indexer: 负责把单个文件写入向量库的文档索引器
+        :param upload_dir: 上传原件保存目录, 缺省读取 config.DOCUMENT_UPLOAD_DIR
+        :param max_concurrent: 同时运行的索引任务数, 缺省读取 config.INGEST_MAX_CONCURRENT
+        :param max_upload_bytes: 单个文件最大字节数, 缺省读取 config.DOCUMENT_MAX_UPLOAD_BYTES
+        :return: None
+        """
         self.indexer = indexer
         self.upload_dir = Path(upload_dir or config.DOCUMENT_UPLOAD_DIR).resolve()
         self.max_concurrent = max(1, max_concurrent or config.INGEST_MAX_CONCURRENT)

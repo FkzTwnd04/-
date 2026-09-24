@@ -65,6 +65,11 @@ ENV_SOURCE = _load_environment()
 class Config:
     
     def __init__(self, config_file=config_file_path):
+        """
+        函数功能: 读取 config.ini 并结合环境变量初始化项目路径、MySQL/Redis/Milvus、大模型、Jev、检索、意图/FAQ 阈值、上传摄取和日志等全部配置项; 密钥缺失时只发出警告不抛异常.
+        :param config_file: config.ini 文件路径, 传 None 时使用项目根目录下的 config.ini
+        :return: None
+        """
         
         self.config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         

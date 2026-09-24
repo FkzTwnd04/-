@@ -29,6 +29,10 @@ from base.logger import logger
 from base.config import config
 
 def create_app() -> FastAPI:
+    """
+    函数功能: 创建并装配 FastAPI 应用, 包括 CORS 与 trace_id 中间件、静态目录挂载、首页、业务路由和系统状态接口, 并执行密钥配置自检.
+    :return: 装配完成的 FastAPI 应用实例
+    """
     
     app = FastAPI(title="智学答问答系统", description="智学答教育资料智能问答系统")
 
@@ -70,6 +74,10 @@ def create_app() -> FastAPI:
     
     @app.get("/")               
     async def read_root():
+        """
+        函数功能: 返回静态目录下的 index.html 作为首页.
+        :return: 指向 static/index.html 的 FileResponse
+        """
         return FileResponse(static_dir / "index.html")
 
     

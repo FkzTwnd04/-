@@ -9,6 +9,11 @@ import jieba
 from base.logger import logger
 
 def preprocess_text(text):
+    """
+    函数功能: 将文本转为小写后用 jieba 精确模式分词; 输入没有 lower 方法(如 None)时记录错误并返回空列表.
+    :param text: 待分词的文本字符串
+    :return: 分词结果列表, 失败时为 []
+    """
     
     logger.info("开始预处理文本")
     try:

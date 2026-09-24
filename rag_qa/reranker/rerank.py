@@ -28,6 +28,10 @@ class Reranker:
     
     @staticmethod
     def _detect_device() -> str:
+        """
+        函数功能: 检测 CUDA 是否可用以选择运行设备; 导入 torch 或检测出错时降级为 cpu.
+        :return: "cuda" 或 "cpu"
+        """
         try:
             import torch
 
@@ -38,6 +42,10 @@ class Reranker:
     
     @property
     def model(self):
+        """
+        函数功能: 延迟加载重排模型, 首次访问时用 model_path 和 device 创建 CrossEncoder 并缓存.
+        :return: CrossEncoder 模型实例
+        """
         if self._model is None:
             from sentence_transformers import CrossEncoder
 

@@ -137,6 +137,11 @@ class HybridRetriever(BaseRetriever):
 
     
     def add(self, chunks) -> int:
+        """
+        函数功能: 把文档块交给 MilvusStore 写入, 并使用本检索器的 embedder 计算向量.
+        :param chunks: Chunk 列表 或 langchain Document 列表
+        :return: 写入条数
+        """
         return self.store.add(chunks, embedder=self.embedder)
 
     def delete_document(self, doc_id: str, tenant_id: str = "default") -> int:

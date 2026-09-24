@@ -15,6 +15,13 @@ logger = logging.getLogger(__name__)
 def _split_text_with_regex_from_end(
         text: str, separator: str, keep_separator: bool
 ) -> List[str]:
+    """
+    函数功能: 按正则分隔符切分文本，keep_separator 为 True 时将分隔符拼接到前一段末尾；分隔符为空时按单字符拆分，并去除空字符串.
+    :param text: 待切分的文本
+    :param separator: 正则分隔符；为空字符串时逐字符拆分
+    :param keep_separator: 是否保留分隔符并附在前一段末尾
+    :return: 切分后的非空文本片段列表
+    """
     
     if separator:
         if keep_separator:

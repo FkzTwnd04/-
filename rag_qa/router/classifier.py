@@ -45,6 +45,10 @@ class QueryClassifier:
 
     
     def load_model(self):
+        """
+        函数功能: 若 model_path 存在则加载已训练的分类模型, 否则基于 bert-base-chinese 初始化二分类新模型, 并移动到当前设备.
+        :return: None
+        """
         base_bert_path = os.path.join(config.MODELS_DIR, 'bert-base-chinese')
         if os.path.exists(self.model_path):
             self.model = BertForSequenceClassification.from_pretrained(self.model_path)
@@ -57,12 +61,22 @@ class QueryClassifier:
 
     
     def save_model(self):
+        """
+        函数功能: 将当前模型和分词器保存到 model_path.
+        :return: None
+        """
         self.model.save_pretrained(self.model_path)
         self.tokenizer.save_pretrained(self.model_path)
         logger.info(f"保存模型至: {self.model_path}")
 
     
     def preprocess_data(self, texts, labels):
+        """
+        函数功能: 对文本批量分词编码(截断/填充, 最大长度 128), 并将中文标签映射为整数标签.
+        :param texts: 文本列表
+        :param labels: 中文标签列表('通用知识' 或 '专业咨询')
+        :return: (分词编码结果, 整数标签列表)
+        """
         encodings = self.tokenizer(
             texts,
             truncation=True,
@@ -74,24 +88,51 @@ class QueryClassifier:
 
     
     def create_dataset(self, encodings, labels):
+        """
+        函数功能: 将分词编码和整数标签封装为可供 Trainer 使用的 torch Dataset.
+        :param encodings: 分词器输出的编码结果
+        :param labels: 整数标签列表
+        :return: torch.utils.data.Dataset 实例
+        """
         class Dataset(torch.utils.data.Dataset):
             def __init__(self, encodings, labels):
+                """
+                函数功能: 保存分词编码和标签.
+                :param encodings: 分词器输出的编码结果
+                :param labels: 整数标签列表
+                :return: None
+                """
                 super().__init__()
                 self.encodings = encodings
                 self.labels = labels
 
             def __getitem__(self, idx):
+                """
+                函数功能: 取出第 idx 条样本的各编码字段, 并附加 labels 张量.
+                :param idx: 样本索引
+                :return: 包含编码字段和 labels 的字典
+                """
                 item = {key: val[idx] for key, val in self.encodings.items()}
                 item["labels"] = torch.tensor(self.labels[idx])
                 return item
 
             def __len__(self):
+                """
+                函数功能: 返回样本数量.
+                :return: 标签列表长度
+                """
                 return len(self.labels)
 
         return Dataset(encodings, labels)
 
     
     def train_model(self, data_file="training_dataset_hybrid_5000.json"):
+        """
+        函数功能: 读取 JSON Lines 数据集, 按 8:2 划分训练/验证集, 用 Trainer 训练 BERT 分类模型, 训练后保存模型并在验证集上评估.
+        数据集文件不存在时记录错误并抛出 FileNotFoundError.
+        :param data_file: 数据集文件路径, 每行一个含 query 和 label 字段的 JSON
+        :return: None
+        """
         if not os.path.exists(data_file):
             logger.error(f"数据集文件 {data_file} 不存在")
             raise FileNotFoundError(f"数据集文件 {data_file} 不存在")
@@ -143,6 +184,11 @@ class QueryClassifier:
 
     
     def compute_metrics(self, eval_pred):
+        """
+        函数功能: 根据 logits 取 argmax 得到预测标签, 计算准确率, 供 Trainer 评估使用.
+        :param eval_pred: (logits, labels) 元组
+        :return: {"accuracy": 准确率}
+        """
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
         accuracy = (predictions == labels).mean()
@@ -150,6 +196,12 @@ class QueryClassifier:
 
     
     def evaluate_model(self, texts, labels):
+        """
+        函数功能: 对给定文本进行批量预测, 并通过日志输出分类报告和混淆矩阵.
+        :param texts: 待评估文本列表
+        :param labels: 对应的整数标签列表
+        :return: None
+        """
         encodings = self.tokenizer(
             texts, truncation=True, padding=True, max_length=128, return_tensors="pt"
         )

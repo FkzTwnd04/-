@@ -52,6 +52,11 @@ def validate_answer_citations(answer: str, citations: Iterable[Citation]) -> Tup
     used = []
 
     def replace(match):
+        """
+        函数功能: re.sub 的替换回调, 编号不在本轮来源中时删除该引用, 否则保留原文并按首次出现顺序记录到 used.
+        :param match: 匹配到的 [Sn] 正则对象
+        :return: 保留时返回原引用文本, 否则返回空串
+        """
         source_id = match.group(1)
         if source_id not in by_id:
             return ""

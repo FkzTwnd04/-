@@ -14,6 +14,10 @@ from base.logger import logger
 class MySQLClient:
     
     def __init__(self):
+        """
+        函数功能: 按统一配置连接 MySQL 并创建游标; 连接失败时记录错误并重新抛出 pymysql.MySQLError.
+        :return: None
+        """
         
         self.logger = logger
         try:
@@ -36,6 +40,10 @@ class MySQLClient:
 
     
     def create_table(self):
+        """
+        函数功能: 创建 jpkb 学科问答表(不存在时才创建)并提交; 失败时记录错误并重新抛出 pymysql.MySQLError.
+        :return: None
+        """
         
         create_table_query = """
         CREATE TABLE IF NOT EXISTS jpkb (
@@ -59,6 +67,11 @@ class MySQLClient:
 
     
     def insert_data(self, csv_path):
+        """
+        函数功能: 用 pandas 读取 CSV, 将每行的“学科名称/问题/答案”逐条插入 jpkb 表后统一提交; 任何异常都会记录日志、回滚并重新抛出.
+        :param csv_path: CSV 文件路径, 需包含 学科名称、问题、答案 三列
+        :return: None
+        """
         try:
             
             data = pd.read_csv(csv_path)
@@ -88,6 +101,10 @@ class MySQLClient:
 
     
     def fetch_questions(self):
+        """
+        函数功能: 查询 jpkb 表中的全部问题; 查询失败时记录日志并返回空列表.
+        :return: 游标 fetchall 结果, 每个元素是只含 question 的元组; 失败时为 []
+        """
         try:
             
             self.cursor.execute("select question from jpkb")
@@ -106,6 +123,11 @@ class MySQLClient:
 
     
     def fetch_answer(self, question):
+        """
+        函数功能: 按问题文本精确匹配 jpkb 表并取第一条答案; 查询失败时记录日志并返回 None.
+        :param question: 要查找的问题文本(需与表中 question 完全相等)
+        :return: 答案字符串, 未找到或查询失败时为 None
+        """
         try:
             
             self.cursor.execute("select answer from jpkb where question=%s", (question,))       
@@ -123,6 +145,10 @@ class MySQLClient:
 
     
     def close(self):
+        """
+        函数功能: 关闭 MySQL 连接; 关闭失败时只记录错误日志不抛出.
+        :return: None
+        """
         
         try:
             

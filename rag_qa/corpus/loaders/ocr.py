@@ -17,6 +17,11 @@ rapidocr_paddle 和 rapidocr_onnxruntime 两种导入方式
 '''
 
 def get_ocr(use_cuda: bool = True) -> "RapidOCR":
+    """
+    函数功能: 创建 RapidOCR 识别器，优先使用 rapidocr_paddle 并按 use_cuda 控制 GPU 加速；未安装时降级为 rapidocr_onnxruntime 的默认实例.
+    :param use_cuda: 是否为检测、分类和识别模型启用 GPU 加速，仅对 rapidocr_paddle 生效
+    :return: RapidOCR 识别器实例
+    """
     try:
         from rapidocr_paddle import RapidOCR
         '''

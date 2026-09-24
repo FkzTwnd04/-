@@ -33,6 +33,10 @@ class OCRIMGLoader(BaseLoader):
         yield Document(page_content=line, metadata={"source": self.img_path})
 
     def img2text(self):
+        """
+        函数功能: 对 self.img_path 指向的图片执行 OCR，并将识别出的各行文字用换行拼接.
+        :return: 识别出的文本字符串；未识别到文字时返回空字符串
+        """
         resp = ""
         ocr = get_ocr()
         result, _ = ocr(self.img_path)

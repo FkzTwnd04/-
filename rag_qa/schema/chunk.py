@@ -42,6 +42,10 @@ class Chunk:
     
     @property
     def dedup_key(self) -> str:
+        """
+        函数功能: 生成去重键, 优先用 chunk_id, 其次 doc_id, 都为空时用正文的 MD5.
+        :return: 去重键字符串
+        """
         if self.chunk_id:
             return self.chunk_id
         if self.doc_id:
@@ -126,6 +130,10 @@ class Chunk:
 
     
     def to_dict(self) -> dict:
+        """
+        函数功能: 把 Chunk 的主要字段转成字典(不含 extra).
+        :return: 字段字典
+        """
         return {
             "text": self.text,
             "doc_id": self.doc_id,

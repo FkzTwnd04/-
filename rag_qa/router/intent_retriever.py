@@ -23,6 +23,13 @@ class IntentRetriever:
         bm25_threshold: Optional[float] = None,  # BM25 top1 原始分数下限；低于它时不接受词面命中。
         index_ttl_seconds: Optional[int] = None,  # 内存索引允许使用的秒数；到期后重新读取最新样本。
     ):
+        """
+        函数功能: 保存代表问句存储对象, 设置 BM25 阈值和索引缓存时长(未传时取配置), 并初始化按租户的索引缓存和锁.
+        :param sample_store: 提供 list_active(tenant_id) 的代表问句存储对象
+        :param bm25_threshold: BM25 top1 原始分数下限, None 时取 config.INTENT_BM25_THRESHOLD
+        :param index_ttl_seconds: 内存索引有效秒数, 未传或为 0 时取 config.INTENT_INDEX_TTL_SECONDS
+        :return: None
+        """
         self.sample_store = sample_store
         self.bm25_threshold = bm25_threshold if bm25_threshold is not None else config.INTENT_BM25_THRESHOLD
         self.index_ttl_seconds = index_ttl_seconds or config.INTENT_INDEX_TTL_SECONDS

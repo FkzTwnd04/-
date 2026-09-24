@@ -68,6 +68,10 @@ class MilvusStore:
 
     
     def _create_or_load_collection(self):
+        """
+        函数功能: 集合不存在时按固定 schema 创建集合及稠密/稀疏向量索引(稠密维度未指定时默认 1024), 然后加载集合到内存.
+        :return: None
+        """
         from pymilvus import DataType
 
         if not self.client.has_collection(self.collection_name):
@@ -222,5 +226,11 @@ class MilvusStore:
     
     @staticmethod
     def _sparse_row_to_dict(sparse_matrix, row_index: int) -> dict:
+        """
+        函数功能: 取稀疏矩阵的第 row_index 行, 转成 {词表索引: 权重} 字典供 Milvus 写入.
+        :param sparse_matrix: 稀疏矩阵
+        :param row_index: 行下标
+        :return: {int 索引: float 权重} 字典
+        """
         row = sparse_matrix[[row_index]]
         return {int(idx): float(val) for idx, val in zip(row.indices, row.data)}

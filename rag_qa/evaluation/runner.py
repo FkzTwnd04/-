@@ -78,6 +78,13 @@ class RAGEvaluationRunner:
         intent_predictor=None,  # 可选的“问题 -> 意图标签或 None”函数，用于评测自定义意图方案。
         retrieval_k: Optional[int] = None,  # 检索指标统计的前 K 个结果数；缺省时使用项目配置。
     ):
+        """
+        函数功能: 保存注入的 RAG 系统和意图预测函数, 并确定检索指标使用的 K 值; 不在此处加载模型.
+        :param rag_system: 可选的 RAG 问答系统实例, 为 None 时在首次评测时创建默认实例
+        :param intent_predictor: 可选的意图预测函数, 输入问题返回意图标签或 None
+        :param retrieval_k: 检索指标统计的前 K 个结果数, 缺省时使用 config.RETRIEVAL_K
+        :return: None
+        """
         # 依赖注入使评测器可复用真实 RAG 系统，也可在开发时传入轻量替身。
         self.rag_system = rag_system
         self.intent_predictor = intent_predictor

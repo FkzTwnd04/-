@@ -16,6 +16,11 @@ class TraceIdFilter(logging.Filter):
     """给每条日志补上当前异步上下文的追踪编号，非请求日志使用短横线。"""
 
     def filter(self, record: logging.LogRecord) -> bool:
+        """
+        函数功能: 把当前上下文的 trace_id 写入日志记录的 trace_id 属性, 从不过滤日志.
+        :param record: 待输出的日志记录
+        :return: 始终为 True, 表示保留该条日志
+        """
         record.trace_id = current_trace_id()
         return True
 

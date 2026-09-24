@@ -39,6 +39,10 @@ class BGEM3Embedder:
     
     @staticmethod
     def _detect_device() -> str:
+        """
+        函数功能: 检测 CUDA 是否可用以选择运行设备; 导入 torch 或检测出错时降级为 cpu.
+        :return: "cuda" 或 "cpu"
+        """
         try:
             import torch
 
@@ -50,6 +54,10 @@ class BGEM3Embedder:
     
     @property
     def model(self):
+        """
+        函数功能: 延迟加载 BGE-M3 模型, 首次访问时按 model_path、use_fp16 和 device 创建 BGEM3EmbeddingFunction 并缓存.
+        :return: BGEM3EmbeddingFunction 实例
+        """
         if self._model is None:
             from milvus_model.hybrid import BGEM3EmbeddingFunction
 
@@ -64,6 +72,10 @@ class BGEM3Embedder:
     
     @property
     def dense_dim(self) -> int:
+        """
+        函数功能: 获取模型稠密向量的维度(访问时会触发模型加载).
+        :return: 稠密向量维度
+        """
         return self.model.dim["dense"]
 
     

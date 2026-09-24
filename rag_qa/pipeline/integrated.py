@@ -31,6 +31,10 @@ from rag_qa.router.jev_classifier import JevIntentClassifier
 class IntegratedQASystem:
     
     def __init__(self):
+        """
+        函数功能: 装配 MySQL 客户端、热点问答检索、运营存储、大模型客户端、混合检索器、RAG 系统(含 Jev 分类器)和会话存储, 并初始化会话表; 大模型客户端初始化失败时记录错误后重新抛出异常.
+        :return: None
+        """
         
         self.logger = logger
         self.config = config
@@ -226,6 +230,11 @@ class IntegratedQASystem:
             
             
             def collect_answer_details(details):
+                """
+                函数功能: 用文档台账把 RAG 返回的引用补全文件名并写回 details, 若提供 metadata_callback 则上报回答模式(general_llm 或 rag)和引用列表.
+                :param details: RAG 系统回传的回答详情字典, 含 category 和 citations 等字段, 会被原地修改
+                :return: None
+                """
                 details["citations"] = self._resolve_citation_filenames(
                     details.get("citations", []), tenant_id=tenant_id
                 )
@@ -264,6 +273,10 @@ class IntegratedQASystem:
             yield "", True
 
 def main():
+    """
+    函数功能: 命令行交互入口, 循环读取问题和可选学科类别, 流式打印答案及最近对话历史, 输入 exit 退出; 出现异常时记录并打印错误, 最后关闭 MySQL 连接.
+    :return: None
+    """
     
     qa_system = IntegratedQASystem()  
     

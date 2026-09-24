@@ -27,6 +27,14 @@ class SubjectQASearch:
         threshold: Optional[float] = None,  # 归一化 BM25 分数下限；只有严格大于 0.85 才复用近似答案。
         margin: Optional[float] = None,  # 兼容旧调用参数；当前按用户要求只使用 0.85 分数门槛。
     ):
+        """
+        函数功能: 保存 MySQL 客户端, 确定索引刷新间隔(至少 1 秒)和归一化分数门槛, 并初始化空的题库缓存与 BM25 索引.
+        :param mysql_client: 已连接的 MySQL 客户端
+        :param refresh_seconds: 索引缓存秒数, 为空或 0 时使用 config.HOT_QUESTION_REFRESH_SECONDS
+        :param threshold: 归一化 BM25 分数门槛, 为 None 时使用 config.HOT_QUESTION_BM25_THRESHOLD
+        :param margin: 兼容旧调用的参数, 当前未使用
+        :return: None
+        """
         self.mysql = mysql_client
         self.refresh_seconds = max(1, refresh_seconds or config.HOT_QUESTION_REFRESH_SECONDS)
         self.threshold = config.HOT_QUESTION_BM25_THRESHOLD if threshold is None else threshold

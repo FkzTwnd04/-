@@ -24,6 +24,13 @@ class DocumentIndexer:
         vector_store,  # 提供 add(chunks) 与 delete_document(doc_id, tenant_id) 的检索存储。
         processor=process_documents,  # 可替换的目录解析切分函数；正式运行默认使用项目处理器。
     ):
+        """
+        函数功能: 初始化文档摄取器，保存 MySQL 客户端、向量存储和文档解析切分函数.
+        :param mysql_client: 用于建立摄取台账和知识版本表的 MySQL 客户端
+        :param vector_store: 提供 add(chunks) 与 delete_document(doc_id, tenant_id) 的检索存储
+        :param processor: 目录解析切分函数，默认使用 process_documents
+        :return: None
+        """
         self.mysql = mysql_client
         self.vector_store = vector_store
         self.processor = processor

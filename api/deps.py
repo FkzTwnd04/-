@@ -19,6 +19,10 @@ _ingest_service = None
 _qa_system_lock = Lock()
 
 def get_qa_system() -> IntegratedQASystem:
+    """
+    函数功能: 按需创建进程内共享的 IntegratedQASystem 单例, 使用双重检查加锁保证并发下只初始化一次.
+    :return: 共享的 IntegratedQASystem 实例
+    """
     global _qa_system
     
     if _qa_system is None:

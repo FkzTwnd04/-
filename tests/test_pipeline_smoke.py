@@ -50,6 +50,12 @@ try:
 except Exception:
     class Document:
         def __init__(self, page_content="", metadata=None):
+            """
+            函数功能: langchain_core 缺失时的最小 Document 实现, 保存正文和元数据(metadata 为空时用空字典).
+            :param page_content: 文档正文
+            :param metadata: 元数据字典
+            :return: None
+            """
             self.page_content = page_content
             self.metadata = metadata or {}
 
@@ -86,19 +92,42 @@ print("[OK] 策略名归一化正确(带括号/空格/无效输出都能收敛)"
 
 class FakeLLM:
     def complete(self, prompt, temperature=0.1):
+        """
+        函数功能: 模拟 LLM 一次性补全: 提示包含“子查询”时返回两行子查询“什么是A\\n什么是B”, 否则返回固定回答.
+        :param prompt: 提示词文本
+        :param temperature: 采样温度, 替身中不使用
+        :return: 固定字符串
+        """
         if "子查询" in prompt:
             return "什么是A\n什么是B"
         return "这是模型的一次性回答"
 
     def stream(self, prompt, temperature=0.1):
+        """
+        函数功能: 模拟 LLM 流式输出, 忽略提示词, 逐字产出“流式回答内容”.
+        :param prompt: 提示词文本, 替身中不使用
+        :param temperature: 采样温度, 替身中不使用
+        :return: 逐字符产出的生成器
+        """
         for ch in "流式回答内容":
             yield ch
 
 class FakeVectorStore:
     def __init__(self):
+        """
+        函数功能: 初始化向量库替身, 用 calls 列表记录每次检索调用的参数.
+        :return: None
+        """
         self.calls = []
 
     def hybrid_search_with_rerank(self, query, k=5, source_filter=None):
+        """
+        函数功能: 模拟向量库的混合检索+重排, 记录调用参数并返回两个固定 Document(一个含查询文本, 一个是跨查询重复的块).
+        :param query: 检索查询
+        :param k: 返回数量, 仅被记录
+        :param source_filter: 来源过滤条件, 被记录并写入返回文档的 source
+        :return: 两个 Document 组成的列表
+        """
         self.calls.append({"query": query, "k": k, "source_filter": source_filter})
         return [
             Document(page_content=f"块-{query}-1", metadata={"source": source_filter or "", "timestamp": "2026-01-01"}),
@@ -107,6 +136,11 @@ class FakeVectorStore:
 
 class FakeClassifier:
     def predict_category(self, query):
+        """
+        函数功能: 模拟意图分类器, 无论输入都返回“专业咨询”.
+        :param query: 用户查询, 替身中不使用
+        :return: 固定类别字符串“专业咨询”
+        """
         return "专业咨询"
 
 hyde_chain = RAGPrompts.hyde_prompt() | as_runnable(FakeLLM()) | StrOutputParser()
@@ -121,6 +155,11 @@ print("[OK] LCEL 文本链支持 invoke 与逐段 stream")
 
 class FakeSelector:
     def select_strategy(self, query):
+        """
+        函数功能: 模拟检索策略选择器, 固定返回子查询检索策略.
+        :param query: 用户查询, 替身中不使用
+        :return: STRATEGY_SUBQUERY
+        """
         return STRATEGY_SUBQUERY
 
 vs = FakeVectorStore()
@@ -191,13 +230,32 @@ from rag_qa.reranker.rerank import Reranker
 
 class FakeEmbedder:
     def embed_one(self, text):
+        """
+        函数功能: 模拟向量编码器, 不加载模型, 固定返回稠密向量 [0.1, 0.2] 和稀疏向量 {1: 0.5}.
+        :param text: 待编码文本, 替身中不使用
+        :return: (稠密向量, 稀疏向量) 元组
+        """
         return [0.1, 0.2], {1: 0.5}
 
 class FakeStore:
     def __init__(self):
+        """
+        函数功能: 初始化 Milvus 存储替身, last_filters 用于记录最近一次检索收到的过滤条件.
+        :return: None
+        """
         self.last_filters = None
 
     def hybrid_search_raw(self, dense_vector, sparse_vector, k, filters, dense_weight, sparse_weight):
+        """
+        函数功能: 模拟 Milvus 原始混合检索, 记录过滤条件并返回 3 个固定子块命中(c1、c2 属于父块 p1, c3 属于父块 p2).
+        :param dense_vector: 稠密查询向量, 替身中不使用
+        :param sparse_vector: 稀疏查询向量, 替身中不使用
+        :param k: 返回数量, 替身中不使用
+        :param filters: 过滤条件, 保存到 last_filters
+        :param dense_weight: 稠密检索权重, 替身中不使用
+        :param sparse_weight: 稀疏检索权重, 替身中不使用
+        :return: 含 entity 字段的命中字典列表
+        """
         self.last_filters = filters
         
         return [
@@ -213,6 +271,13 @@ class FakeReranker:
     """按文本长度打分, 用来验证排序真的生效(不加载真实模型)."""
 
     def rerank(self, query, chunks, top_k=None):
+        """
+        函数功能: 模拟重排器, 以文本长度作为 score 写回每个块并按分数降序排序, 给定 top_k 时截取前 top_k 个.
+        :param query: 查询文本, 替身中不使用
+        :param chunks: 待重排的 Chunk 列表(会被原地写入 score)
+        :param top_k: 保留数量, 为空时返回全部
+        :return: 排序后的 Chunk 列表
+        """
         for c in chunks:
             c.score = float(len(c.text))
         ranked = sorted(chunks, key=lambda c: c.score, reverse=True)

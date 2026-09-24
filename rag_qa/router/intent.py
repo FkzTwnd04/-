@@ -17,6 +17,11 @@ GREETING_PATTERNS = (
 )
 
 def check_greeting(query: str) -> Optional[str]:
+    """
+    函数功能: 去除首尾空白后按 GREETING_PATTERNS 顺序进行忽略大小写的正则匹配, 命中则返回对应固定回复.
+    :param query: 用户查询文本
+    :return: 命中的问候回复文本；未命中返回 None
+    """
     query_text = query.strip()  
     for pattern, response in GREETING_PATTERNS:
         if re.match(pattern, query_text, re.IGNORECASE):

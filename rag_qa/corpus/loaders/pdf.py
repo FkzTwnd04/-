@@ -47,6 +47,10 @@ class OCRPDFLoader(BaseLoader):
         yield Document(page_content=line, metadata={"source": self.file_path})
 
     def pdf2text(self):
+        """
+        函数功能: 逐页提取 PDF 文本，并对宽高占页面比例都不低于 PDF_OCR_THRESHOLD 的图片做 OCR（页面有旋转时先校正图片方向），将结果拼接为一个字符串.
+        :return: 所有页面文本与图片 OCR 结果拼接后的字符串
+        """
         ocr = get_ocr()
         
         doc = fitz.open(self.file_path)

@@ -17,6 +17,11 @@ class DocumentDeduplicator:
         self,
         document_store: DocumentStore,  # 负责持久化内容指纹和来源路径的文档台账。
     ):
+        """
+        函数功能: 初始化去重器，保存用于内容指纹判定的文档台账.
+        :param document_store: 负责持久化内容指纹和来源路径的文档台账
+        :return: None
+        """
         self.document_store = document_store
 
     @staticmethod

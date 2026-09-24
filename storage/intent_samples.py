@@ -22,6 +22,12 @@ class IntentSampleStore:
         mysql_client,  # 已建立连接的 MySQL 客户端，负责执行 SQL 和提交事务。
         tenant_id: str = "default",  # 未接入鉴权前使用的单租户默认值；不能当作可信多租户身份。
     ):
+        """
+        函数功能: 绑定 MySQL 客户端和租户标识(为空时回退为 "default"), 并创建保护共享游标的可重入锁.
+        :param mysql_client: 已连接的 MySQL 客户端
+        :param tenant_id: 默认数据租户
+        :return: None
+        """
         self.mysql = mysql_client
         self.tenant_id = tenant_id or "default"
         self._lock = RLock()  # 同一进程内串行保护共享游标，避免并发 SQL 互相覆盖结果。

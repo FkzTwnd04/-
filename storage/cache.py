@@ -14,6 +14,10 @@ from base.logger import logger
 class RedisClient:
     
     def __init__(self):
+        """
+        函数功能: 按统一配置创建 Redis 客户端(decode_responses=True), 创建时抛出 RedisError 则记录错误并重新抛出.
+        :return: None
+        """
         
         self.logger = logger
 
@@ -35,6 +39,12 @@ class RedisClient:
 
     
     def set_data(self, key, value):
+        """
+        函数功能: 将 value 序列化为 JSON(保留中文)后写入 Redis 指定键, 不设置过期时间; Redis 异常只记录日志不抛出.
+        :param key: Redis 键名
+        :param value: 可被 json.dumps 序列化的待存数据
+        :return: None
+        """
         try:
             
             self.client.set(key, json.dumps(value, ensure_ascii=False)) 
@@ -45,6 +55,11 @@ class RedisClient:
 
     
     def get_data(self, key):
+        """
+        函数功能: 读取 Redis 指定键并按 JSON 反序列化; 键不存在或值为空时返回 None, Redis 异常时记录日志并返回 None.
+        :param key: Redis 键名
+        :return: 反序列化后的数据, 未命中或读取失败时为 None
+        """
         try:
             
             data = self.client.get(key)
@@ -56,6 +71,11 @@ class RedisClient:
 
     
     def get_answer(self, query):
+        """
+        函数功能: 从 Redis 键 "answer:{query}" 读取缓存答案原文(不做 JSON 解析); 未命中或 Redis 异常时返回 None.
+        :param query: 用户问题文本, 直接拼接进缓存键
+        :return: 缓存的答案字符串, 未命中或读取失败时为 None
+        """
         try:
             
             answer = self.client.get(f"answer:{query}")

@@ -10,6 +10,12 @@ import pymysql
 class ConversationStore:
     
     def __init__(self, mysql_client, logger):
+        """
+        函数功能: 保存 MySQL 客户端与日志对象, 并将每个会话保留的最大对话轮数设为 5.
+        :param mysql_client: 已连接的 MySQL 客户端, 需提供 cursor 与 connection
+        :param logger: 日志记录器
+        :return: None
+        """
         
         self.mysql_client = mysql_client
         

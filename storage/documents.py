@@ -33,6 +33,12 @@ class DocumentStore:
         mysql_client,  # 已连接的 MySQL 客户端，用于执行台账 SQL 和提交事务。
         tenant_id: str = "default",  # 当前操作的数据租户；服务鉴权接通前使用默认单租户。
     ):
+        """
+        函数功能: 绑定 MySQL 客户端和租户标识, tenant_id 为空时回退为 "default".
+        :param mysql_client: 已连接的 MySQL 客户端
+        :param tenant_id: 当前操作的数据租户
+        :return: None
+        """
         self.mysql = mysql_client
         self.tenant_id = tenant_id or "default"
 

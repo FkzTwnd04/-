@@ -13,10 +13,21 @@ from modelscope.pipelines import pipeline
 
 class AliTextSplitter(CharacterTextSplitter):
     def __init__(self, pdf: bool = False, **kwargs):
+        """
+        函数功能: 初始化模型切分器，将其余参数传给 CharacterTextSplitter 并记录是否按 PDF 文本预处理.
+        :param pdf: 为 True 时在切分前先清理 PDF 文本中的多余换行和空白
+        :param kwargs: 传给 CharacterTextSplitter 的其他参数
+        :return: None
+        """
         super().__init__(**kwargs)
         self.pdf = pdf
 
     def split_text(self, text: str) -> List[str]:
+        """
+        函数功能: 使用本地 ModelScope 中文文档分段模型(CPU)对文本做语义分段，pdf 为 True 时先规范化换行和空白.
+        :param text: 待切分的原始文本
+        :return: 按模型输出的 "\\n\\t" 分隔并去除空串后的文本片段列表
+        """
         
         
         

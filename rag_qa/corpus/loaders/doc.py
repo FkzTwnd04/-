@@ -46,6 +46,11 @@ class OCRDOCLoader(BaseLoader):
         yield Document(page_content=line, metadata={"source": self.filepath})
 
     def doc2text(self, filepath):
+        """
+        函数功能: 按文档顺序遍历 Word 的段落和表格，提取段落文字、表格单元格文字，并对段落内嵌图片做 OCR 识别后拼接为一个字符串.
+        :param filepath: 待解析的 Word(.docx) 文件路径
+        :return: 拼接后的全文文本字符串
+        """
 
         
         ocr = get_ocr()
@@ -58,6 +63,11 @@ class OCRDOCLoader(BaseLoader):
         resp = ""
         
         def iter_block_items(parent):
+            """
+            函数功能: 按原始顺序逐个产出文档主体或表格单元格中的段落与表格块；parent 类型不支持时抛出 ValueError.
+            :param parent: python-docx 的 Document 对象或表格单元格 _Cell 对象
+            :return: 生成器，依次产出 Paragraph 或 Table 对象
+            """
             
             if isinstance(parent, Docu2):
                 parent_elm = parent.element.body

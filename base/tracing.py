@@ -31,13 +31,28 @@ class StageTimer:
     """记录一段同步阶段耗时；elapsed_ms 在 with 结束后可读取。"""
 
     def __init__(self):
+        """
+        函数功能: 初始化计时器, 将耗时和起始时间都置为 0.
+        :return: None
+        """
         self.elapsed_ms = 0.0
         self._started = 0.0
 
     def __enter__(self):
+        """
+        函数功能: 进入 with 块时用 perf_counter 记录起始时间.
+        :return: 计时器自身, 便于 with ... as 读取 elapsed_ms
+        """
         self._started = perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        """
+        函数功能: 退出 with 块时计算并保存以毫秒为单位的耗时, 不吞掉块内异常.
+        :param exc_type: 块内异常类型, 无异常时为 None
+        :param exc_value: 块内异常实例, 无异常时为 None
+        :param traceback: 块内异常堆栈, 无异常时为 None
+        :return: False, 表示异常照常向外抛出
+        """
         self.elapsed_ms = (perf_counter() - self._started) * 1000
         return False

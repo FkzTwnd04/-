@@ -20,6 +20,14 @@ class JevIntentClassifier:
     GENERAL = "general_llm"
 
     def __init__(self, api_key=None, model=None, timeout=None, confidence_threshold=None):
+        """
+        函数功能: 初始化 Jev 路由分类器的 API 密钥、模型、超时和置信度阈值, 未传入的参数取配置默认值.
+        :param api_key: Jev API 密钥, None 时取 config.JEV_API_KEY
+        :param model: Jev 模型名, 未传时取 config.JEV_MODEL
+        :param timeout: 请求超时秒数, 未传时取 config.JEV_TIMEOUT_SECONDS
+        :param confidence_threshold: 路由置信度下限, None 时取 config.JEV_CONFIDENCE_THRESHOLD
+        :return: None
+        """
         self.api_key = api_key if api_key is not None else config.JEV_API_KEY
         self.model = model or config.JEV_MODEL
         self.timeout = timeout or config.JEV_TIMEOUT_SECONDS

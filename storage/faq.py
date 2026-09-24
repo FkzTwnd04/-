@@ -143,6 +143,13 @@ class BM25Search:
         :return: 默认返回 (答案, 是否需要继续走 RAG)；include_metadata=True 时多返回命中层。
         """
         def result(answer, need_rag, hit_layer=None):
+            """
+            函数功能: 按外层 include_metadata 决定返回二元组还是附带命中层的三元组.
+            :param answer: FAQ 答案, 未命中时为 None
+            :param need_rag: 是否需要继续走 RAG
+            :param hit_layer: 命中层(L1/L2a/L2b), 未命中时为 None
+            :return: include_metadata 为 True 时返回 (answer, need_rag, hit_layer), 否则返回 (answer, need_rag)
+            """
             return (answer, need_rag, hit_layer) if include_metadata else (answer, need_rag)
 
         if not query or not isinstance(query, str):
@@ -216,6 +223,12 @@ class BM25Search:
         query_vector = list(map(float, embedder.embed([query])["dense"][0]))
 
         def cosine(left, right):
+            """
+            函数功能: 计算两个向量的余弦相似度; 任一向量范数为 0 时返回 0.0.
+            :param left: 第一个向量(浮点数列表)
+            :param right: 第二个向量(浮点数列表)
+            :return: 余弦相似度浮点数
+            """
             dot = sum(a * b for a, b in zip(left, right))
             left_norm = sum(value * value for value in left) ** 0.5
             right_norm = sum(value * value for value in right) ** 0.5
