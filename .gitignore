@@ -1,0 +1,35 @@
+# 敏感配置：本地 .env 存放密钥与密码，禁止入库
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+venv/
+frontend/node_modules/
+frontend/.npm-cache/
+
+# 本地模型权重与原始资料（体积大，按 README 单独下载或放置）
+rag_qa/models/
+rag_qa/data/
+
+# 评测运行产物
+rag_qa/evaluation/results/
+
+# 本地环境与工具记录
+_env_report.txt
+.workbuddy/
+
+# 日志
+logs/*.log
+
+# IDE
+.idea/
+.vscode/
+
+# 系统文件
+.DS_Store
+Thumbs.db
