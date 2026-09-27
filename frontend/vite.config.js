@@ -6,7 +6,7 @@ export default defineConfig({
   base: "/static/",
   build: {
     outDir: "../static",
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: false,
   },
   server: {

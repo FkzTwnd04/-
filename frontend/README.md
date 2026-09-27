@@ -1,13 +1,21 @@
 # 智学答前端
 
-`frontend/` 是智学答自己的 React 工作台。界面布局和基础样式参考并迁入 UltraRAG 的聊天工作台，页面品牌、交互和数据接口已经按本项目重写。它不连接 UltraRAG 的服务；问答、文档、评测和运营数据全部通过本项目的 FastAPI API 获取。
+`frontend/` 是智学答的 React 前端，问答、文档、评测和运营数据全部通过本项目的 FastAPI API 获取。
 
 ## 页面
 
-- **AI 问答**：创建和切换会话、发送问题、接收 WebSocket 流式回答，并提交有帮助/没帮助反馈。
+- **问答**：创建和切换会话、发送问题、接收 WebSocket 流式回答，并提交有帮助/没帮助反馈。
 - **知识库**：上传资料、查看摄取台账和状态、重新提交失败的入库任务。
-- **评测中心**：上传 JSONL 评测集，选择 RAG 或意图模式，查看任务状态和下载最近报告。
-- **运营日志**：查看命中层统计、脱敏后的请求日志和高频问题候选，并人工审核候选答案。
+- **评测**：上传 JSONL 评测集，选择 RAG 或意图模式，查看任务状态和下载最近报告。
+- **运营**：查看命中层统计、脱敏后的请求日志和高频问题候选，并人工审核候选答案。
+
+## 代码结构
+
+- `src/App.jsx`：外壳组件，负责侧栏导航、会话列表、主题切换，以及提问、流式接收和反馈。
+- `src/api.js`：`requestJson`、`postJson`、`pollUntilDone`、`streamQuestion` 等接口工具。
+- `src/components.jsx`：图标、卡片、页面标题、状态标签等共用组件。
+- `src/pages/`：`ChatPage`、`DocumentsPage`、`EvaluationPage`、`OperationsPage` 四个页面。
+- `src/styles.css`：全部样式；设计变量在 `:root`，深色主题通过 `html[data-theme="dark"]` 覆盖变量。
 
 ## 构建和启动
 
