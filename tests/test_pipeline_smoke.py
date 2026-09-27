@@ -123,15 +123,15 @@ class FakeVectorStore:
 
     def hybrid_search_with_rerank(self, query, k=5, source_filter=None):
         """
-        函数功能: 模拟向量库的混合检索+重排, 记录调用参数并返回两个固定 Document(一个含查询文本, 一个是跨查询重复的块).
+        函数功能: 模拟向量库的混合检索+重排, 记录调用参数; 与真实 HybridRetriever 一样返回 Chunk, 另混入一个旧式 Document 检验兼容.
         :param query: 检索查询
         :param k: 返回数量, 仅被记录
-        :param source_filter: 来源过滤条件, 被记录并写入返回文档的 source
-        :return: 两个 Document 组成的列表
+        :param source_filter: 来源过滤条件, 被记录并写入返回块的 source
+        :return: 一个含查询文本的 Chunk 和一个跨查询重复的 Document
         """
         self.calls.append({"query": query, "k": k, "source_filter": source_filter})
         return [
-            Document(page_content=f"块-{query}-1", metadata={"source": source_filter or "", "timestamp": "2026-01-01"}),
+            Chunk(text=f"块-{query}-1", source=source_filter or "", publish_time="2026-01-01"),
             Document(page_content="重复的块", metadata={"source": source_filter or "", "timestamp": "2026-01-01"}),
         ]
 

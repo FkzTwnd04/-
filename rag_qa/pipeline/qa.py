@@ -109,7 +109,7 @@ class RAGSystem:
                 q, k=self.retrieval_k, source_filter=source_filter
             ) or []
             
-            hit_chunks.extend(Chunk.from_document(doc) for doc in docs)
+            hit_chunks.extend(to_chunk(doc) for doc in docs)
             logger.info(f"查询 '{q}' 检索到 {len(docs)} 个文档块")
 
         
