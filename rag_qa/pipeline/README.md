@@ -33,7 +33,7 @@
 
 ## Jev 路由与失败处理
 
-`jev_classifier.py` 调用 TypeSafe 的 `/v1/systemone` 接口，对“专业 RAG 问题”和“通用大模型问题”两个固定选项作选择。RAG、Agent、AI 及相关工程实践属于专业问题；通用常识、日常问题等走通用大模型。当前置信度门槛为 0.70。Jev API 密钥缺失、调用失败、输出选项异常或置信度过低时，系统回退到完整 RAG。
+`jev_classifier.py` 调用 System One 接口（默认经 OpenRouter：`https://openrouter.ai/api/v1/systemone`，地址由 `.env` 的 `JEV_ENDPOINT` 配置），对“专业 RAG 问题”和“通用大模型问题”两个固定选项作选择。RAG、Agent、AI 及相关工程实践属于专业问题；通用常识、日常问题等走通用大模型。当前置信度门槛为 0.70。Jev API 密钥缺失、调用失败、输出选项异常或置信度过低时，系统回退到完整 RAG。
 
 运行在线 Jev 分类前，需要在本地 `.env` 配置 `JEV_API_KEY`。Jev 不会因为加入系统就自动知道本项目知识库内容；专业问题仍要经过 RAG 检索。
 

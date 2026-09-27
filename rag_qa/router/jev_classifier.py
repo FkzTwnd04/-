@@ -15,21 +15,22 @@ from base.logger import logger
 class JevIntentClassifier:
     """使用 Jev 的 Choice 输出在专业 RAG 与通用 LLM 之间进行路由。"""
 
-    ENDPOINT = "https://api.typesafe.ai/v1/systemone"
     PROFESSIONAL = "professional_rag"
     GENERAL = "general_llm"
 
-    def __init__(self, api_key=None, model=None, timeout=None, confidence_threshold=None):
+    def __init__(self, api_key=None, model=None, timeout=None, confidence_threshold=None, endpoint=None):
         """
-        函数功能: 初始化 Jev 路由分类器的 API 密钥、模型、超时和置信度阈值, 未传入的参数取配置默认值.
+        函数功能: 初始化 Jev 路由分类器的 API 密钥、模型、接口地址、超时和置信度阈值, 未传入的参数取配置默认值.
         :param api_key: Jev API 密钥, None 时取 config.JEV_API_KEY
         :param model: Jev 模型名, 未传时取 config.JEV_MODEL
         :param timeout: 请求超时秒数, 未传时取 config.JEV_TIMEOUT_SECONDS
         :param confidence_threshold: 路由置信度下限, None 时取 config.JEV_CONFIDENCE_THRESHOLD
+        :param endpoint: System One 接口地址, 未传时取 config.JEV_ENDPOINT
         :return: None
         """
         self.api_key = api_key if api_key is not None else config.JEV_API_KEY
         self.model = model or config.JEV_MODEL
+        self.endpoint = endpoint or config.JEV_ENDPOINT
         self.timeout = timeout or config.JEV_TIMEOUT_SECONDS
         self.confidence_threshold = (
             confidence_threshold
@@ -67,7 +68,7 @@ class JevIntentClassifier:
             },
         }
         request = Request(
-            self.ENDPOINT,
+            self.endpoint,
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
             headers={
                 "Authorization": f"Bearer {self.api_key}",
