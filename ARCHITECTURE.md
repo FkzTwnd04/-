@@ -214,7 +214,7 @@ flowchart TD
 
 `frontend/` 是本项目自己的 React 前端：左侧深色导航栏放功能入口和历史对话，右侧是问答或管理页面。数据接口全部指向本项目的 FastAPI；知识库、评测、运营页面分别使用本项目的文档、评测和运营 API。Vite 构建会把页面和静态资源写入 `static/`，由 `api/server.py` 提供首页。
 
-本地运行前端开发模式：在 `frontend/` 执行 `pnpm install` 和 `pnpm dev`；运行完整应用时先执行 `pnpm build`，再按 API README 启动 FastAPI。普通页面启动不要求 MySQL、Redis、Milvus 或模型服务在线；首次问答、文档摄取和运营查询会按功能连接相应依赖。
+本地运行前端开发模式：在 `frontend/` 执行 `npm install` 和 `npm run dev`；运行完整应用时先执行 `npm run build`，再按根目录 README 启动 FastAPI。普通页面启动不要求 MySQL、Redis、Milvus 或模型服务在线；首次问答、文档摄取和运营查询会按功能连接相应依赖。
 
 ## 文档摄取与评测流程
 

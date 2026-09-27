@@ -13,10 +13,10 @@
 在项目依赖已经安装的 Python 环境中，从仓库根目录运行：
 
 ```powershell
-python -m pytest tests/test_pipeline_smoke.py
+python tests/test_pipeline_smoke.py
 ```
 
-如果当前环境未安装 pytest 或项目依赖，应先使用项目指定的 Python 环境安装依赖；不要把“因环境缺库无法启动”误判成业务断言失败。
+脚本会逐项输出 `[OK]`，最后显示“全部冒烟测试通过”。如果当前环境缺少项目依赖，应先使用项目指定的 Python 环境安装依赖；不要把“因环境缺库无法启动”误判成业务断言失败。
 
 ## 逐步补齐的验证层次
 

@@ -16,8 +16,13 @@ frontend/.npm-cache/
 rag_qa/models/
 rag_qa/data/
 
-# 评测运行产物
+# 评测运行产物与上传的评测集
 rag_qa/evaluation/results/
+rag_qa/evaluation/uploaded_datasets/
+
+# 本地 Docker 启动 Milvus 的编排文件与数据卷
+milvus-compose.yml
+volumes/
 
 # 本地环境与工具记录
 _env_report.txt

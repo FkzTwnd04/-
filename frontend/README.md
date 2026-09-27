@@ -23,14 +23,14 @@
 
 ```powershell
 cd frontend
-pnpm install
-pnpm build
+npm install
+npm run build
 cd ..
 python -m uvicorn api.server:app --host 127.0.0.1 --port 8080
 ```
 
 打开 `http://127.0.0.1:8080` 查看页面，`http://127.0.0.1:8080/docs` 查看 API 文档。若 Windows 没有 `python` 命令，可使用已安装的 Python 解释器执行最后一条命令。
 
-仅开发前端时，在 `frontend/` 执行 `pnpm dev`，Vite 会把 `/api` 和 `/health` 请求代理到 `http://127.0.0.1:8080`。
+仅开发前端时，在 `frontend/` 执行 `npm run dev`，Vite 会把 `/api` 和 `/health` 请求代理到 `http://127.0.0.1:8080`。
 
 前端页面可在没有数据库和模型服务时启动。真正问答及知识库、评测、运营数据操作仍需按项目根目录 `.env.example` 配置相应外部服务和密钥。

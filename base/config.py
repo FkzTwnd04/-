@@ -188,7 +188,7 @@ class Config:
             return value
 
         
-        self.secret_status[env_key] = '缺失'
+        self.secret_status[env_key] = '缺失' if required else '未配置(可选)'
         if required:
             warnings.warn(
                 f"未读取到敏感配置 {env_key}({description}), 请在 {env_file_path} 中配置, 可参考 .env.example",

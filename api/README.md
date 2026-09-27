@@ -2,10 +2,10 @@
 
 ## 本地启动
 
-在 Windows 上先安装 Python 3.12 和 Node.js 20，再从项目根目录执行：
+完整的环境准备（MySQL、Redis、Milvus、模型和 `.env`）见根目录 [README.md](../README.md)。在 Windows 上先安装 Python 3.11 和 Node.js 20，再从项目根目录执行：
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 cd frontend
