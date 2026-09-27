@@ -6,10 +6,11 @@
 这些需要集成测试和离线评测补充。
 """
 
+import os
 import sys
 import types
 
-ROOT = r"D:\Desktop\RAGAgent\ra-g-agent\integrated_qa_system"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 def install_stub(name, attrs=(), submodule_of=None):

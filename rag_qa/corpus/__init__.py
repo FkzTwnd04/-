@@ -11,15 +11,15 @@ from rag_qa.corpus.processor import (
 )
 
 try:
-    from rag_qa.corpus.splitters import ChineseRecursiveTextSplitter, AliTextSplitter
+    from rag_qa.corpus.splitters import ChineseTextSplitter, SemanticSplitter
 except ImportError:      
-    ChineseRecursiveTextSplitter = None
-    AliTextSplitter = None
+    ChineseTextSplitter = None
+    SemanticSplitter = None
 
 try:
-    from rag_qa.corpus.loaders import OCRPDFLoader, OCRDOCLoader, OCRPPTLoader, OCRIMGLoader
+    from rag_qa.corpus.loaders import PdfLoader, WordLoader, SlideLoader, ImageLoader
 except ImportError:      
-    OCRPDFLoader = OCRDOCLoader = OCRPPTLoader = OCRIMGLoader = None
+    PdfLoader = WordLoader = SlideLoader = ImageLoader = None
 
 try:
     from rag_qa.corpus.dedup import content_hash, dedup_documents
@@ -36,12 +36,12 @@ __all__ = [
     "document_loaders",
     "load_documents_from_directory",
     "process_documents",
-    "ChineseRecursiveTextSplitter",
-    "AliTextSplitter",
-    "OCRPDFLoader",
-    "OCRDOCLoader",
-    "OCRPPTLoader",
-    "OCRIMGLoader",
+    "ChineseTextSplitter",
+    "SemanticSplitter",
+    "PdfLoader",
+    "WordLoader",
+    "SlideLoader",
+    "ImageLoader",
     "content_hash",
     "dedup_documents",
     "CorpusIndexer",

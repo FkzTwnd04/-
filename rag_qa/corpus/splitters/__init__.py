@@ -1,12 +1,13 @@
 """
-导出中文递归切分器和模型辅助切分器，供 processor 通过统一入口选择。
-实际使用哪种切分器由处理代码和配置决定；
-引入模型切分器还需要准备本地模型及其运行依赖。
+导出中文递归切分器和模型切分器，供 processor 通过统一入口选择。
+模型切分器还需要本地模型及 modelscope 依赖，未安装时只有它不可用。
 """
 
-from .recursive import *
+from rag_qa.corpus.splitters.recursive import ChineseTextSplitter
 
 try:
-    from .model import *
+    from rag_qa.corpus.splitters.model import SemanticSplitter
 except ImportError:
-    pass
+    SemanticSplitter = None
+
+__all__ = ["ChineseTextSplitter", "SemanticSplitter"]

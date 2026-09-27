@@ -1,134 +1,62 @@
 """
-适配 Word 文档读取，将文件内容转换为 LangChain 文档或项目后续处理可使用的数据，
-并尽量保留文件名、页码等来源元信息。
-此模块只解决 Word 格式解析；
-文本规范化和分块由 processor/splitters 处理，向量化与写库由 retriev
-er 负责。
+按原文顺序读取 Word(.docx) 的段落和表格，段落内嵌图片交给 OCR 识别。
+表格每行输出为“单元格 | 单元格”一行，保留行内对应关系。
+此模块只解决 Word 格式解析；文本规范化和分块由 processor/splitters 处理。
 """
 
-from typing import Iterator
-from rag_qa.corpus.loaders.ocr import get_ocr
+import docx
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+from docx.parts.image import ImagePart
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 
-from tqdm import tqdm
-from docx.table import _Cell, Table  
-from docx.oxml.table import CT_Tbl  
-from docx.oxml.text.paragraph import CT_P  
-from docx.text.paragraph import Paragraph  
-from docx import Document as Docu1
-from docx.document import Document as Docu2
-from docx import ImagePart  
-from PIL import Image  
-from io import BytesIO  
-import numpy as np  
-from langchain_core.documents import Document
-from langchain_core.document_loaders import BaseLoader
+from rag_qa.corpus.loaders.base import FileTextLoader, join_lines
+from rag_qa.corpus.loaders.ocr import recognize_text
 
-class OCRDOCLoader(BaseLoader):
-    """An example document loader that reads a file line by line."""
 
-    def __init__(self, filepath: str) -> None:
-        """Initialize the loader with a file path.
+class WordLoader(FileTextLoader):
 
-        Args:
-            filepath_path: The path to the filepath to load.
+    def extract_text(self) -> str:
         """
-        self.filepath = filepath
-
-    def lazy_load(self) -> Iterator[Document]:
-        
-        """A lazy loader that reads a file line by line.
-
-        When you're implementing lazy load methods, you should use a generator
-        to yield documents one by one.
+        函数功能: 遍历文档主体中的段落与表格, 拼接文字、表格行和图片识别结果.
+        :return: Word 全文字符串
         """
+        document = docx.Document(self.file_path)
+        lines = []
+        for element in document.element.body.iterchildren():
+            if isinstance(element, CT_P):
+                lines.append(Paragraph(element, document).text)
+                lines.extend(self._inline_image_text(document, element))
+            elif isinstance(element, CT_Tbl):
+                lines.extend(self._table_lines(Table(element, document)))
+        return join_lines(lines)
 
-        line = self.doc2text(self.filepath)
-        yield Document(page_content=line, metadata={"source": self.filepath})
-
-    def doc2text(self, filepath):
+    @staticmethod
+    def _inline_image_text(document, paragraph_element):
         """
-        函数功能: 按文档顺序遍历 Word 的段落和表格，提取段落文字、表格单元格文字，并对段落内嵌图片做 OCR 识别后拼接为一个字符串.
-        :param filepath: 待解析的 Word(.docx) 文件路径
-        :return: 拼接后的全文文本字符串
+        函数功能: 识别段落中嵌入的图片文字.
+        :param document: python-docx 文档对象
+        :param paragraph_element: 段落 XML 元素
+        :return: 生成器, 每张图片产出一段识别文本
         """
+        for rel_id in paragraph_element.xpath(".//a:blip/@r:embed"):
+            part = document.part.related_parts.get(rel_id)
+            if isinstance(part, ImagePart):
+                yield recognize_text(part.blob)
 
-        
-        ocr = get_ocr()
-        
-
-        
-        doc = Docu1(filepath)
-        
-        
-        resp = ""
-        
-        def iter_block_items(parent):
-            """
-            函数功能: 按原始顺序逐个产出文档主体或表格单元格中的段落与表格块；parent 类型不支持时抛出 ValueError.
-            :param parent: python-docx 的 Document 对象或表格单元格 _Cell 对象
-            :return: 生成器，依次产出 Paragraph 或 Table 对象
-            """
-            
-            if isinstance(parent, Docu2):
-                parent_elm = parent.element.body
-            
-            elif isinstance(parent, _Cell):
-                parent_elm = parent._tc
-            else:
-                raise ValueError("OCRDOCLoader parse fail")  
-            
-            
-            
-            for child in parent_elm.iterchildren():
-                
-                if isinstance(child, CT_P):  
-                    yield Paragraph(child, parent)  
-                elif isinstance(child, CT_Tbl):  
-                    yield Table(child, parent)  
-
-        
-        
-        
-        b_unit = tqdm(total=len(doc.paragraphs) + len(doc.tables),
-                      desc="OCRDOCLoader block index: 0")
-
-        
-        for i, block in enumerate(iter_block_items(doc)):
-            
-            b_unit.set_description("OCRDOCLoader  block index: {}".format(i))
-            b_unit.refresh()  
-
-            
-            if isinstance(block, Paragraph):
-                resp += block.text.strip() + "\n"  
-                
-                images = block._element.xpath('.//pic:pic')
-                for image in images:
-                    
-                    for img_id in image.xpath('.//a:blip/@r:embed'):
-                        part = doc.part.related_parts[img_id]  
-                        if isinstance(part, ImagePart):  
-                            
-                            
-                            image = Image.open(BytesIO(part._blob))  
-                            result, _ = ocr(np.array(image))  
-                            if result:  
-                                ocr_result = [line[1] for line in result]  
-                                resp += "\n".join(ocr_result)  
-            
-            elif isinstance(block, Table):
-                
-                for row in block.rows:
-                    for cell in row.cells:
-                        for paragraph in cell.paragraphs:
-                            resp += paragraph.text.strip() + "\n"  
-
-            
-            b_unit.update(1)
-        
-        return resp
-
-if __name__ == '__main__':
-    docx_loader = OCRDOCLoader(filepath='/0001.项目目录/others/test/人工智能就业课课程大纲.docx')
-    doc = docx_loader.load()
-    print(doc)
+    @staticmethod
+    def _table_lines(table):
+        """
+        函数功能: 把表格每一行转成一行文本, 合并单元格造成的相邻重复内容只保留一次.
+        :param table: python-docx 表格对象
+        :return: 生成器, 每行表格产出一行文本
+        """
+        for row in table.rows:
+            cells = []
+            for cell in row.cells:
+                text = cell.text.strip()
+                if text and (not cells or cells[-1] != text):
+                    cells.append(text)
+            if cells:
+                yield " | ".join(cells)

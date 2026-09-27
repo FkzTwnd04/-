@@ -1,28 +1,28 @@
 """
-统一组织 PDF、Word、PPT 和图片加载器的导入，使 processor 可以按文件类型调
-用对应实现。
-OCR 是多个格式加载器可能共用的文字提取能力；
-依赖缺失或文件损坏时应让调用方得到可诊断的异常，而不是误把空文本当作成功入库。
+统一导出 PDF、Word、PPT 和图片加载器，使 processor 可以按文件类型选择实现。
+各加载器依赖不同的第三方解析库，某个库未安装时只影响对应格式，其余加载器仍可导入。
 """
 
-from base.config import config
+from rag_qa.corpus.loaders.base import FileTextLoader
 
 try:
-    from .doc import *
+    from rag_qa.corpus.loaders.pdf import PdfLoader
 except ImportError:
-    pass
+    PdfLoader = None
 
 try:
-    from .ppt import *
+    from rag_qa.corpus.loaders.doc import WordLoader
 except ImportError:
-    pass
+    WordLoader = None
 
 try:
-    from .image import *
+    from rag_qa.corpus.loaders.ppt import SlideLoader
 except ImportError:
-    pass
+    SlideLoader = None
 
 try:
-    from .pdf import *
+    from rag_qa.corpus.loaders.image import ImageLoader
 except ImportError:
-    pass
+    ImageLoader = None
+
+__all__ = ["FileTextLoader", "PdfLoader", "WordLoader", "SlideLoader", "ImageLoader"]

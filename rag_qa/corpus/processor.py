@@ -15,19 +15,21 @@ from langchain_text_splitters import MarkdownTextSplitter
 
 from base.config import config
 from base.logger import logger
-from rag_qa.corpus.splitters import ChineseRecursiveTextSplitter
-from rag_qa.corpus.loaders import OCRPDFLoader, OCRDOCLoader, OCRPPTLoader, OCRIMGLoader
+from rag_qa.corpus.splitters import ChineseTextSplitter
+from rag_qa.corpus.loaders import PdfLoader, WordLoader, SlideLoader, ImageLoader
 
-document_loaders = {
+_format_loaders = {
     ".txt": TextLoader,
-    ".pdf": OCRPDFLoader,
-    ".docx": OCRDOCLoader,
-    ".ppt": OCRPPTLoader,
-    ".pptx": OCRPPTLoader,
-    ".jpg": OCRIMGLoader,
-    ".png": OCRIMGLoader,
+    ".pdf": PdfLoader,
+    ".docx": WordLoader,
+    ".pptx": SlideLoader,
+    ".jpg": ImageLoader,
+    ".jpeg": ImageLoader,
+    ".png": ImageLoader,
     ".md": UnstructuredMarkdownLoader,
 }
+# 对应解析库未安装的格式不登记，扫描目录时会作为不支持的类型跳过。
+document_loaders = {ext: loader for ext, loader in _format_loaders.items() if loader is not None}
 
 def load_documents_from_directory(directory_path: str):
     """
@@ -98,8 +100,8 @@ def process_documents(
     logger.info(f"加载的文档数量: {len(documents)}")
 
     
-    parent_splitter = ChineseRecursiveTextSplitter(chunk_size=parent_chunk_size, chunk_overlap=chunk_overlap)
-    child_splitter = ChineseRecursiveTextSplitter(chunk_size=child_chunk_size, chunk_overlap=chunk_overlap)
+    parent_splitter = ChineseTextSplitter(chunk_size=parent_chunk_size, chunk_overlap=chunk_overlap)
+    child_splitter = ChineseTextSplitter(chunk_size=child_chunk_size, chunk_overlap=chunk_overlap)
     markdown_parent_splitter = MarkdownTextSplitter(chunk_size=parent_chunk_size, chunk_overlap=chunk_overlap)
     markdown_child_splitter = MarkdownTextSplitter(chunk_size=child_chunk_size, chunk_overlap=chunk_overlap)
 
@@ -113,7 +115,7 @@ def process_documents(
         parent_splitter_to_use = markdown_parent_splitter if is_markdown else parent_splitter
         child_splitter_to_use = markdown_child_splitter if is_markdown else child_splitter
         logger.info(
-            f'处理文档: {doc.metadata["file_path"]}, 使用切分器: {"Markdown" if is_markdown else "ChineseRecursive"}'
+            f'处理文档: {doc.metadata["file_path"]}, 使用切分器: {"Markdown" if is_markdown else "ChineseText"}'
         )
 
         

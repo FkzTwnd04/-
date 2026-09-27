@@ -22,8 +22,8 @@
 ## 目录分工
 
 - `processor.py` 是主入口，根据扩展名选择加载器，调用切分器并整理输出。它负责协调文档解析和切分，不应承担 MySQL 状态机或 API 文件上传逻辑。
-- `loaders/` 按文件格式读取正文。PDF、Word、PPT 和图片加载器负责格式适配，`ocr.py` 提供扫描页面或图片识别能力。
-- `splitters/recursive.py` 根据段落、句子等边界递归拆分长文本；`splitters/model.py` 利用文档分段模型判断切分位置。
+- `loaders/` 按文件格式读取正文。`base.py` 定义“一个文件产出一个 Document”的基类；`PdfLoader`、`WordLoader`、`SlideLoader`、`ImageLoader` 分别适配 PDF、Word(.docx)、PPT(.pptx) 和图片；`ocr.py` 提供进程内复用的 OCR 引擎，供扫描页、内嵌图片和图片文件使用。
+- `splitters/recursive.py` 的 `ChineseTextSplitter` 按段落、换行、句末标点、分号、逗号的顺序递归切分，标点保留在前一句末尾；`splitters/model.py` 的 `SemanticSplitter` 用本地文档分段模型判断切分位置。
 - `dedup.py` 按原始文件内容哈希及稳定来源路径识别新文件、重复文件或同路径更新文件，避免相同文件重复切分和向量化。
 - `indexer.py` 登记文档台账、调用解析切分、补全租户/文档元数据、写入 Milvus 并更新成功或失败状态。更新时旧向量的删除与新向量写入并非跨系统原子事务，失败恢复需谨慎处理。
 

@@ -1,121 +1,54 @@
 """
-读取 PPT/PPTX 页面中的文字和来源信息，并将页面内容整理为统一文档对象交给 proces
-sor。
-加载器不负责跨页合并策略、中文切块或 Milvus 写入；
-这些步骤分别由语料处理和检索模块承担。
+逐页读取 PPTX 幻灯片，按从上到下、从左到右的阅读顺序提取文本框、表格和图片中的文字。
+加载器不负责跨页合并策略、中文切块或 Milvus 写入；这些步骤分别由语料处理和检索模块承担。
 """
 
-from typing import Iterator
-from rag_qa.corpus.loaders.ocr import get_ocr
-from langchain_core.documents import Document
-from langchain_core.document_loaders import BaseLoader
 from pptx import Presentation
-from PIL import Image
-import numpy as np
-from io import BytesIO
-from tqdm import tqdm
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-class OCRPPTLoader(BaseLoader):
-    """An example document loader that reads a file line by line."""
+from rag_qa.corpus.loaders.base import FileTextLoader, join_lines
+from rag_qa.corpus.loaders.ocr import recognize_text
 
-    def __init__(self, filepath: str) -> None:
-        """Initialize the loader with a file path.
 
-        Args:
-            filepath: The path to the ppt to load.
+def _reading_order(shape):
+    """
+    函数功能: 生成形状的排序键, 位置缺失的形状排在最前.
+    :param shape: python-pptx 形状对象
+    :return: (上边距, 左边距) 元组
+    """
+    return (shape.top or 0, shape.left or 0)
+
+
+class SlideLoader(FileTextLoader):
+
+    def extract_text(self) -> str:
         """
-        self.filepath = filepath
-
-    def lazy_load(self) -> Iterator[Document]:
-        
-        """A lazy loader that reads a file line by line.
-
-        When you're implementing lazy load methods, you should use a generator
-        to yield documents one by one.
+        函数功能: 按幻灯片顺序拼接每页所有形状的文字.
+        :return: 演示文稿全文字符串
         """
+        presentation = Presentation(self.file_path)
+        lines = []
+        for slide in presentation.slides:
+            for shape in sorted(slide.shapes, key=_reading_order):
+                lines.extend(self._shape_lines(shape))
+        return join_lines(lines)
 
-        line = self.ppt2text(self.filepath)
-        yield Document(page_content=line, metadata={"source": self.filepath})
-
-    def ppt2text(self, filepath):
+    def _shape_lines(self, shape):
         """
-        函数功能: 逐页遍历 PPT 幻灯片，按形状的上、左位置排序后提取文本框、表格文字及图片 OCR 结果，拼接为一个字符串.
-        :param filepath: 待解析的 PPT(.pptx) 文件路径
-        :return: 所有幻灯片内容拼接后的文本字符串
+        函数功能: 提取单个形状的文字; 组合形状递归展开, 表格按行输出, 图片走 OCR.
+        :param shape: python-pptx 形状对象
+        :return: 生成器, 产出文本行
         """
-        
-        prs = Presentation(filepath)
-        print(f'prs-->{prs}')
-        
-        ocr = get_ocr()
-        
-        resp = ""
-
-        def extract_text(shape):
-            """
-            函数功能: 从单个形状中提取文本框文字、表格单元格文字和图片(shape_type 13) OCR 结果追加到外层 resp；遇到组合形状(shape_type 6)时递归处理子形状.
-            :param shape: python-pptx 的幻灯片形状对象
-            :return: None
-            """
-            
-            
-            nonlocal resp
-
-            
-            if shape.has_text_frame:
-                
-                resp += shape.text.strip() + "\n"
-
-            
-            if shape.has_table:
-                
-                for row in shape.table.rows:
-                    
-                    for cell in row.cells:
-                        
-                        for paragraph in cell.text_frame.paragraphs:
-                            
-                            resp += paragraph.text.strip() + "\n"
-
-            
-            if shape.shape_type == 13:  
-                
-                image = Image.open(BytesIO(shape.image.blob))
-                
-                result, _ = ocr(np.array(image))
-                if result:  
-                    
-                    ocr_result = [line[1] for line in result]
-                    
-                    resp += "\n".join(ocr_result)
-
-            
-            elif shape.shape_type == 6:  
-                
-                for child_shape in shape.shapes:
-                    extract_text(child_shape)
-
-        
-        b_unit = tqdm(total=len(prs.slides), desc="OCRPPTLoader slide index: 1")
-
-        
-        for slide_number, slide in enumerate(prs.slides, start=1):
-            
-            b_unit.set_description("OCRPPTLoader slide index: {}".format(slide_number))
-            b_unit.refresh()  
-
-            
-            sorted_shapes = sorted(slide.shapes, key=lambda x: (x.top, x.left))
-
-            for shape in sorted_shapes:
-                extract_text(shape)  
-
-            b_unit.update(1)  
-
-        return resp  
-
-if __name__ == '__main__':
-    from base.config import config
-    img_loader = OCRPPTLoader(filepath=f'{config.DATA_DIR}/ai_data/01.pptx')
-    doc = img_loader.load()
-    print(doc)
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            for child in sorted(shape.shapes, key=_reading_order):
+                yield from self._shape_lines(child)
+            return
+        if shape.has_text_frame:
+            yield shape.text_frame.text
+        if shape.has_table:
+            for row in shape.table.rows:
+                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if cells:
+                    yield " | ".join(cells)
+        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+            yield recognize_text(shape.image.blob)

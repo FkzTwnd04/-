@@ -85,7 +85,3 @@ python -m rag_qa.evaluation.runner --dataset path/to/your_eval.jsonl --run-name 
 - **Mean Latency**：端到端单题耗时均值，包含分类、检索、重排和生成等阶段；目前没有分阶段计时。
 
 本实现不计算 Faithfulness、语义相关性或事实正确性，因为这些指标需要额外标注或独立评审器。不要把字面 F1 当作事实忠实度，也不要把评测分数写成线上服务质量保证。后续可在评测数据和基础指标稳定后接入 RAGAS 或经过人工校验的模型评审，并单独报告评审器设置。
-
-## UltraRAG 参考
-
-评测模块的拆分思路参考本机 UltraRAG 项目的 `servers/benchmark` 和 `servers/evaluation`，借鉴其将数据、运行流程和评价步骤分开组织的方式。本模块代码按当前项目的 RAGSystem 与 Chunk 接口编写，没有将 UltraRAG 的运行代码或源码当作本项目实现。

@@ -1,35 +1,54 @@
 """
-封装 OCR 相关依赖和文字识别入口，为图片或扫描文档加载器提供共享能力。
-输入是页面图像或图片文件，输出是识别出的文本；
-它不决定文档切分粒度、不保存文档记录，也不访问向量库。
+为各格式加载器提供共享的图片文字识别能力：输入图片文件、图片字节或像素数组，输出识别出的文本。
+OCR 引擎按需创建并在进程内复用；它不决定切分粒度、不保存文档记录，也不访问向量库。
+模糊或复杂版面的图片识别效果有限，重要资料入库后应抽查识别结果。
 """
 
-from typing import TYPE_CHECKING
-'''
-paddleocr：解析图片中的文字，也可以进行表格识别
-rapidocr_paddle 和 rapidocr_onnxruntime 两种导入方式
-主要区别在于它们所使用的推理引擎和硬件支持
-选择哪种方式最合适取决于你的硬件环境和性能需求。
-当你有 GPU 且追求速度时：使用 rapidocr_paddle。PaddlePaddle 原生支持在 GPU 上推理 PaddleOCR 模型，速度更快。
-当只有 CPU 且需要高效推理时：使用 rapidocr_onnxruntime。它在 CPU 上进行了优化，资源占用较低.
+from io import BytesIO
+from pathlib import Path
 
-注意: OCR不是万能的, 如果比较模糊的图片, 它识别效果也不是特别OK, 可以借助一些多模态大模型来处理. 
-'''
+import numpy as np
+from PIL import Image
 
-def get_ocr(use_cuda: bool = True) -> "RapidOCR":
+_engine = None
+
+
+def get_ocr_engine():
     """
-    函数功能: 创建 RapidOCR 识别器，优先使用 rapidocr_paddle 并按 use_cuda 控制 GPU 加速；未安装时降级为 rapidocr_onnxruntime 的默认实例.
-    :param use_cuda: 是否为检测、分类和识别模型启用 GPU 加速，仅对 rapidocr_paddle 生效
-    :return: RapidOCR 识别器实例
+    函数功能: 返回进程内共享的 RapidOCR 引擎; 装了 rapidocr_paddle 时用 GPU 版本, 否则使用 CPU 上的 rapidocr_onnxruntime.
+    :return: 可直接调用的 RapidOCR 实例, 调用结果为 (识别结果列表, 耗时)
     """
-    try:
-        from rapidocr_paddle import RapidOCR
-        '''
-        det_use_cuda=True：启用检测模型的GPU加速。cls_use_cuda=True：启用分类模型的GPU加速。rec_use_cuda=True：启用识别模型的GPU加速。
-        '''
-        ocr = RapidOCR(det_use_cuda=use_cuda, cls_use_cuda=use_cuda, rec_use_cuda=use_cuda)
-    except ImportError:
-        
-        from rapidocr_onnxruntime import RapidOCR
-        ocr = RapidOCR()
-    return ocr
+    global _engine
+    if _engine is None:
+        try:
+            from rapidocr_paddle import RapidOCR
+            _engine = RapidOCR(det_use_cuda=True, cls_use_cuda=True, rec_use_cuda=True)
+        except ImportError:
+            from rapidocr_onnxruntime import RapidOCR
+            _engine = RapidOCR()
+    return _engine
+
+
+def _to_array(image) -> np.ndarray:
+    """
+    函数功能: 把图片路径、字节、PIL 图片统一转换成 RGB 像素数组, 已是数组时原样返回.
+    :param image: 图片路径(str/Path)、图片字节、PIL.Image 或 numpy 数组
+    :return: numpy 像素数组
+    """
+    if isinstance(image, np.ndarray):
+        return image
+    if isinstance(image, (str, Path)):
+        image = Path(image).read_bytes()
+    if isinstance(image, (bytes, bytearray)):
+        image = Image.open(BytesIO(image))
+    return np.array(image.convert("RGB"))
+
+
+def recognize_text(image) -> str:
+    """
+    函数功能: 识别一张图片中的文字, 按识别顺序每行一段拼接.
+    :param image: 图片路径、图片字节、PIL.Image 或 numpy 像素数组
+    :return: 识别出的文本; 没有文字时返回空字符串
+    """
+    result, _ = get_ocr_engine()(_to_array(image))
+    return "\n".join(item[1] for item in result or [])

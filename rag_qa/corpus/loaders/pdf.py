@@ -1,137 +1,63 @@
 """
-解析 PDF 页面文字并保留可用的页码和文件来源；
-遇到扫描页或文本抽取不足时，可通过 OCR 路径补充识别。
+逐页提取 PDF 的文字层；页面中占比足够大的图片（通常是扫描页或截图）再交给 OCR 补充识别。
 提取文本作为 processor 的输入，后续由切分器形成检索块。
 PDF 解析成功不保证 OCR 结果无误，需对重要资料抽查。
 """
 
-"""
-OCR介绍:
-    简单说就是'光学字符识别'技术, Optical Character Recognition, 能让电脑'看懂'图片里的文字,
-    把图片上的手写体, 印刷体文字转换成可编辑的文本 -> 例如: 照片里的笔记,扫描版pdf的文字等.
-"""
-
-import cv2
-import fitz  
+import fitz
 import numpy as np
-from PIL import Image
-from tqdm import tqdm
-from typing import Iterator
-from rag_qa.corpus.loaders.ocr import get_ocr
-from langchain_core.documents import Document
-from langchain_core.document_loaders import BaseLoader
-from langchain_text_splitters import CharacterTextSplitter
 
-PDF_OCR_THRESHOLD = (0.6, 0.6)
+from rag_qa.corpus.loaders.base import FileTextLoader, join_lines
+from rag_qa.corpus.loaders.ocr import recognize_text
 
-class OCRPDFLoader(BaseLoader):
-    """An example document loader that reads a file line by line."""
+# 图片宽、高都至少占页面这个比例才做 OCR，避免把图标、页眉装饰图也识别一遍。
+MIN_IMAGE_RATIO = 0.6
 
-    def __init__(self, file_path: str) -> None:
-        """Initialize the loader with a file path.
 
-        Args:
-            file_path: The path to the file to load.
+class PdfLoader(FileTextLoader):
+
+    def extract_text(self) -> str:
         """
-        self.file_path = file_path
-
-    def lazy_load(self) -> Iterator[Document]:
-        
-        """A lazy loader that reads a file line by line.
-
-        When you're implementing lazy load methods, you should use a generator
-        to yield documents one by one.
+        函数功能: 按页顺序拼接文字层与大图的 OCR 结果.
+        :return: PDF 全文字符串
         """
+        lines = []
+        with fitz.open(self.file_path) as pdf:
+            for page in pdf:
+                lines.append(page.get_text("text"))
+                for info in page.get_image_info(xrefs=True):
+                    xref = info.get("xref")
+                    if xref and self._is_large_image(info["bbox"], page.rect):
+                        lines.append(recognize_text(self._image_pixels(pdf, xref, page.rotation)))
+        return join_lines(lines)
 
-        line = self.pdf2text()
-        yield Document(page_content=line, metadata={"source": self.file_path})
-
-    def pdf2text(self):
+    @staticmethod
+    def _is_large_image(bbox, page_rect) -> bool:
         """
-        函数功能: 逐页提取 PDF 文本，并对宽高占页面比例都不低于 PDF_OCR_THRESHOLD 的图片做 OCR（页面有旋转时先校正图片方向），将结果拼接为一个字符串.
-        :return: 所有页面文本与图片 OCR 结果拼接后的字符串
+        函数功能: 判断图片在页面上的显示区域是否足够大.
+        :param bbox: 图片显示区域 (x0, y0, x1, y1)
+        :param page_rect: 页面矩形
+        :return: 宽、高占比都不低于 MIN_IMAGE_RATIO 时为 True
         """
-        ocr = get_ocr()
-        
-        doc = fitz.open(self.file_path)
-        
-        
-        resp = ""
-        b_unit = tqdm(total=doc.page_count, desc="OCRPDFLoader context page index: 0")
-        for i, page in enumerate(doc):
-            b_unit.set_description("OCRPDFLoader context page index: {}".format(i))
-            b_unit.refresh()
-            
-            text = page.get_text("text")
-            resp += text + "\n"
-            
-            
-            
-            img_list = page.get_image_info(xrefs=True)
-            
-            
-            for img in img_list:
-                
-                if xref := img.get("xref"):
-                    
-                    bbox = img["bbox"]
-                    
-                    if ((bbox[2] - bbox[0]) / (page.rect.width) < PDF_OCR_THRESHOLD[0]
-                            or (bbox[3] - bbox[1]) / (page.rect.height) < PDF_OCR_THRESHOLD[1]):
-                        continue
-                    pix = fitz.Pixmap(doc, xref)
-                    
-                    if int(page.rotation) != 0:  
-                        img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, -1)
-                        tmp_img = Image.fromarray(img_array)
-                        ori_img = cv2.cvtColor(np.array(tmp_img), cv2.COLOR_RGB2BGR)
-                        rot_img = self.rotate_img(img=ori_img, angle=360 - page.rotation)
-                        img_array = cv2.cvtColor(rot_img, cv2.COLOR_RGB2BGR)
-                    else:
-                        img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, -1)
+        width_ratio = (bbox[2] - bbox[0]) / page_rect.width
+        height_ratio = (bbox[3] - bbox[1]) / page_rect.height
+        return width_ratio >= MIN_IMAGE_RATIO and height_ratio >= MIN_IMAGE_RATIO
 
-                    
-                    
-                    result, _ = ocr(img_array)
-                    if result:
-                        ocr_result = [line[1] for line in result]
-                        resp += "\n".join(ocr_result)
-            
-            b_unit.update(1)
-        return resp
-
-    def rotate_img(self, img, angle):
-        '''
-        img   --image
-        angle --rotation angle
-        return--rotated img
-        '''
-
-        h, w = img.shape[:2]
-        rotate_center = (w / 2, h / 2)
-        
-        
-        
-        
-        M = cv2.getRotationMatrix2D(rotate_center, angle, 1.0)
-        
-        new_w = int(h * np.abs(M[0, 1]) + w * np.abs(M[0, 0]))
-        new_h = int(h * np.abs(M[0, 0]) + w * np.abs(M[0, 1]))
-        
-        M[0, 2] += (new_w - w) / 2
-        M[1, 2] += (new_h - h) / 2
-
-        rotated_img = cv2.warpAffine(img, M, (new_w, new_h))
-        return rotated_img
-
-if __name__ == '__main__':
-    from base.config import Config
-    pdf_loader = OCRPDFLoader(file_path=f"{Config().DATA_DIR}/ai_data/LLM基础知识.pdf")
-    doc = pdf_loader.load()
-
-    print(type(doc))
-    print(doc)
-    
-    
-    
-    
+    @staticmethod
+    def _image_pixels(pdf, xref: int, rotation: int) -> np.ndarray:
+        """
+        函数功能: 取出 PDF 内嵌图片并转成 RGB 像素数组, 页面有旋转时同步转正.
+        :param pdf: 已打开的 fitz 文档
+        :param xref: 图片对象编号
+        :param rotation: 页面顺时针旋转角度(0/90/180/270)
+        :return: numpy 像素数组
+        """
+        pix = fitz.Pixmap(pdf, xref)
+        if pix.n - pix.alpha != 3:
+            pix = fitz.Pixmap(fitz.csRGB, pix)
+        if pix.alpha:
+            pix = fitz.Pixmap(pix, 0)
+        pixels = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+        if rotation % 360:
+            pixels = np.rot90(pixels, k=-(rotation // 90))
+        return np.ascontiguousarray(pixels)
